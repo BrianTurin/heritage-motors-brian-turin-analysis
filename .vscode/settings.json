@@ -1,0 +1,6 @@
+{
+    // Configuración para que archivos .md se visualicen como Markdown
+    "workbench.editorAssociations": {
+        "*.md": "default"
+    }
+}
