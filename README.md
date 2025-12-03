@@ -55,11 +55,19 @@ RepoProyectoIO/
 │   └── XYZ_analisis.py                  # Clasificación XYZ por variabilidad
 │
 ├── ForecastModels/                      # Modelos de pronóstico
-│   └── Holt-Winters/
-│       ├── winters_forecast.py          # Modelo Holt-Winters completo
-│       ├── winters_forecast.png         # Gráficos del análisis
-│       ├── winters_results.csv          # Resultados históricos
-│       └── winters_forecast.csv         # Pronósticos futuros (12 meses)
+│   ├── Holt-Winters/
+│   │   ├── winters_forecast.py          # Modelo Holt-Winters completo
+│   │   ├── winters_forecast.png         # Gráficos del análisis
+│   │   ├── winters_results.csv          # Resultados históricos
+│   │   └── winters_forecast.csv         # Pronósticos futuros (12 meses)
+│   │
+│   └── Prophet/
+│       ├── prophet_forecast.py          # Modelo Prophet (Facebook/Meta)
+│       ├── prophet_forecast.png         # Gráficos del análisis
+│       ├── prophet_components.png       # Componentes nativos de Prophet
+│       ├── prophet_results.csv          # Resultados históricos
+│       ├── prophet_forecast.csv         # Pronósticos con intervalos de confianza
+│       └── requirements_prophet.txt     # Dependencias específicas de Prophet
 │
 ├── Estimacion/                          # Scripts de estimación auxiliares
 │   ├── MetodoWinters.py                 # Implementación alternativa Winters
@@ -104,6 +112,7 @@ pip install -r requirements_winters.txt
 - **numpy** (≥1.24.0): Cálculos numéricos
 - **matplotlib** (≥3.7.0): Visualización de datos
 - **statsmodels** (≥0.14.0): Modelos estadísticos y series temporales
+- **prophet** (≥1.1.0): Modelo de pronóstico de Facebook/Meta
 
 ---
 
@@ -207,6 +216,61 @@ El modelo identificó en los datos analizados:
 - **Estacionalidad**: Fuerte patrón cíclico (picos en noviembre: ~$670K)
 - **Precisión (MAPE)**: ~31% (aceptable para serie corta de 29 meses)
 
+#### Modelo Prophet (Facebook/Meta)
+
+**`ForecastModels/Prophet/prophet_forecast.py`**
+
+Prophet es un modelo de pronóstico desarrollado por Facebook/Meta, diseñado para series temporales con patrones estacionales fuertes y datos históricos de varios años.
+
+**Características del modelo:**
+- **Detección automática** de tendencia y estacionalidad
+- **Manejo robusto** de datos faltantes y outliers
+- **Intervalos de confianza** del 95% para cada pronóstico
+- **Puntos de cambio**: Detecta automáticamente cambios en la tendencia
+
+**Configuración utilizada:**
+- **Estacionalidad anual**: Activada
+- **Modo**: Aditivo
+- **Intervalo de confianza**: 95%
+
+**Métricas de Evaluación:**
+- MAE (Error Absoluto Medio)
+- RMSE (Raíz del Error Cuadrático Medio)
+- MAPE (Error Porcentual Absoluto Medio)
+
+**Salidas generadas:**
+- `prophet_forecast.png`: 3 gráficos de análisis
+  1. Serie temporal histórica vs pronóstico con intervalos de confianza
+  2. Componente estacional
+  3. Residuos del modelo
+- `prophet_components.png`: Componentes nativos de Prophet (tendencia + estacionalidad)
+- `prophet_results.csv`: Valores históricos, ajustados y residuos
+- `prophet_forecast.csv`: Pronósticos con límites inferior y superior (12 periodos)
+
+```bash
+python ForecastModels\Prophet\prophet_forecast.py
+```
+
+**Interpretación de Resultados:**
+
+El modelo Prophet identificó:
+- **Puntos de cambio**: 22 cambios detectados en la tendencia
+- **Tendencia**: Creciente
+- **Estacionalidad**: Patrón anual claro con pico en noviembre (~$600K)
+- **Precisión (MAPE)**: ~13% (mejor ajuste que Holt-Winters)
+
+#### Comparación de Modelos
+
+| Métrica | Holt-Winters | Prophet |
+|---------|--------------|---------|
+| **MAPE** | 31,54% | **13,39%** ✅ |
+| **MAE** | $36.298 | **$12.567** ✅ |
+| **RMSE** | $55.808 | **$18.373** ✅ |
+| **Total Pronóstico (12 meses)** | $2.776.620 | $2.417.382 |
+| **Intervalos de Confianza** | No | Sí (95%) |
+
+**Conclusión**: Prophet muestra mejor precisión en este dataset debido a su capacidad de detectar múltiples puntos de cambio en la tendencia y su robustez con series temporales cortas.
+
 ### 4. Análisis de Demanda de Componentes
 
 **`DemandaComponentes.py`**
@@ -239,8 +303,9 @@ python DemandaComponentes.py
    ├─> python Analisis/ABC_analysis.py
    └─> python Analisis/XYZ_analisis.py
 
-4. Pronóstico de Ventas
-   └─> python ForecastModels/Holt-Winters/winters_forecast.py
+4. Pronóstico de Ventas (elegir uno o ambos)
+   ├─> python ForecastModels/Holt-Winters/winters_forecast.py
+   └─> python ForecastModels/Prophet/prophet_forecast.py
 
 5. Cálculo de Demanda de Componentes
    └─> python DemandaComponentes.py
@@ -278,14 +343,16 @@ Representan la mayor inversión en inventario (Clase A).
 1. **Análisis ABC**: Principio de Pareto (80-20)
 2. **Análisis XYZ**: Coeficiente de variación estadístico
 3. **Suavización Exponencial**: Modelo Holt-Winters triple
-4. **Series Temporales**: Descomposición en tendencia, estacionalidad y ruido
+4. **Prophet**: Modelo aditivo generalizado de Facebook/Meta
+5. **Series Temporales**: Descomposición en tendencia, estacionalidad y ruido
 
 ### Herramientas
 - **Python 3.13**: Lenguaje de programación
 - **Pandas**: Manipulación de datos tabulares
 - **NumPy**: Operaciones numéricas eficientes
 - **Matplotlib**: Generación de gráficos profesionales
-- **Statsmodels**: Modelos estadísticos avanzados
+- **Statsmodels**: Modelos estadísticos avanzados (Holt-Winters)
+- **Prophet**: Modelo de pronóstico de Facebook/Meta
 
 ---
 
@@ -314,11 +381,19 @@ Mes,Classic Cars,Vintage Cars
 ...
 ```
 
-**`winters_forecast.csv`**: Pronósticos mensuales
+**`winters_forecast.csv`**: Pronósticos mensuales (Holt-Winters)
 ```csv
 Periodo,Pronostico
 2005-06-01,87761.58
 2005-07-01,178767.12
+...
+```
+
+**`prophet_forecast.csv`**: Pronósticos con intervalos de confianza (Prophet)
+```csv
+Periodo,Pronostico,Limite_Inferior,Limite_Superior
+2005-06-01,73473.11,35297.13,110273.02
+2005-07-01,167937.13,132631.61,202040.02
 ...
 ```
 
@@ -331,7 +406,7 @@ Este proyecto fue desarrollado como trabajo final para la materia Investigación
 ### Responsabilidades del Equipo
 - **Análisis de datos y limpieza**: Dataset IO, exploración inicial
 - **Modelos de clasificación**: Implementación ABC-XYZ
-- **Modelos de pronóstico**: Holt-Winters, validación estadística
+- **Modelos de pronóstico**: Holt-Winters, Prophet, validación estadística
 - **Visualización y reportes**: Gráficos, documentación, presentación
 
 ---
@@ -351,4 +426,4 @@ Para consultas sobre el proyecto:
 
 ---
 
-**Fecha de última actualización**: Diciembre 2025, martes 2
+**Fecha de última actualización**: Diciembre 2025
