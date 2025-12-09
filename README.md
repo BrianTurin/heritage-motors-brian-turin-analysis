@@ -61,13 +61,20 @@ RepoProyectoIO/
 │   │   ├── winters_results.csv          # Resultados históricos
 │   │   └── winters_forecast.csv         # Pronósticos futuros (12 meses)
 │   │
-│   └── Prophet/
-│       ├── prophet_forecast.py          # Modelo Prophet (Facebook/Meta)
-│       ├── prophet_forecast.png         # Gráficos del análisis
-│       ├── prophet_components.png       # Componentes nativos de Prophet
-│       ├── prophet_results.csv          # Resultados históricos
-│       ├── prophet_forecast.csv         # Pronósticos con intervalos de confianza
-│       └── requirements_prophet.txt     # Dependencias específicas de Prophet
+│   ├── Prophet/
+│   │   ├── prophet_forecast.py          # Modelo Prophet (Facebook/Meta)
+│   │   ├── prophet_forecast.png         # Gráficos del análisis
+│   │   ├── prophet_components.png       # Componentes nativos de Prophet
+│   │   ├── prophet_results.csv          # Resultados históricos
+│   │   ├── prophet_forecast.csv         # Pronósticos con intervalos de confianza
+│   │   └── requirements_prophet.txt     # Dependencias específicas de Prophet
+│   │
+│   └── SARIMA/
+│       ├── sarima_forecast.py           # Modelo SARIMA completo
+│       ├── sarima_forecast.png          # Gráficos del análisis
+│       ├── sarima_diagnostics.png       # Diagnóstico del modelo (ACF, PACF, Q-Q)
+│       ├── sarima_results.csv           # Resultados históricos
+│       └── sarima_forecast.csv          # Pronósticos con intervalos de confianza
 │
 ├── Estimacion/                          # Scripts de estimación auxiliares
 │   ├── MetodoWinters.py                 # Implementación alternativa Winters
@@ -89,30 +96,39 @@ RepoProyectoIO/
 
 - Python 3.8 o superior
 - pip (gestor de paquetes de Python)
+- Git (para clonar el repositorio)
 
-### Instalación de Dependencias
+### Instalación Rápida
 
-```bash
-# Crear entorno virtual (recomendado)
+```powershell
+# 1. Clonar el repositorio
+git clone https://github.com/JuanBrun/RepoProyectoIO.git
+cd RepoProyectoIO
+
+# 2. Crear y activar entorno virtual
 python -m venv .venv
-
-# Activar entorno virtual
-# Windows PowerShell:
 .venv\Scripts\Activate.ps1
-# Windows CMD:
-.venv\Scripts\activate.bat
 
-# Instalar dependencias
+# 3. Instalar dependencias
 pip install -r requirements_winters.txt
+pip install prophet
+```
+
+### Instalación Manual de Dependencias
+
+```powershell
+pip install pandas>=2.0.0 numpy>=1.24.0 matplotlib>=3.7.0 statsmodels>=0.14.0 prophet>=1.1.0
 ```
 
 ### Dependencias Principales
 
-- **pandas** (≥2.0.0): Manipulación y análisis de datos
-- **numpy** (≥1.24.0): Cálculos numéricos
-- **matplotlib** (≥3.7.0): Visualización de datos
-- **statsmodels** (≥0.14.0): Modelos estadísticos y series temporales
-- **prophet** (≥1.1.0): Modelo de pronóstico de Facebook/Meta
+| Paquete | Versión | Descripción |
+|---------|---------|-------------|
+| **pandas** | ≥2.0.0 | Manipulación y análisis de datos |
+| **numpy** | ≥1.24.0 | Cálculos numéricos |
+| **matplotlib** | ≥3.7.0 | Visualización de datos |
+| **statsmodels** | ≥0.14.0 | Modelos estadísticos (Holt-Winters, SARIMA) |
+| **prophet** | ≥1.1.0 | Modelo de pronóstico de Facebook/Meta |
 
 ---
 
@@ -259,17 +275,81 @@ El modelo Prophet identificó:
 - **Estacionalidad**: Patrón anual claro con pico en noviembre (~$600K)
 - **Precisión (MAPE)**: ~13% (mejor ajuste que Holt-Winters)
 
+#### Modelo SARIMA (Seasonal ARIMA)
+
+**`ForecastModels/SARIMA/sarima_forecast.py`**
+
+SARIMA (Seasonal Autoregressive Integrated Moving Average) es un modelo estadístico clásico para series temporales que combina componentes autorregresivos, de media móvil y diferenciación, tanto regulares como estacionales.
+
+**Modelo matemático:**
+$$y_t = c + \phi_1 y_{t-1} + \theta_1 \varepsilon_{t-1} + \Phi_1 y_{t-12} + \Theta_1 \varepsilon_{t-12} + \varepsilon_t$$
+
+**Configuración utilizada: SARIMA(1,1,1)(1,0,1)₁₂**
+
+**Componentes no estacionales (p,d,q):**
+- **p = 1**: 1 término autorregresivo (AR)
+- **d = 1**: 1 diferenciación para estacionariedad
+- **q = 1**: 1 término de media móvil (MA)
+
+**Componentes estacionales (P,D,Q,s):**
+- **P = 1**: 1 término AR estacional
+- **D = 0**: Sin diferenciación estacional (para preservar datos en serie corta)
+- **Q = 1**: 1 término MA estacional
+- **s = 12**: Período estacional de 12 meses
+
+**Parámetros estimados:**
+- **φ₁ (AR1)**: Coeficiente autorregresivo no estacional
+- **θ₁ (MA1)**: Coeficiente de media móvil no estacional
+- **Φ₁ (SAR12)**: Coeficiente autorregresivo estacional
+- **Θ₁ (SMA12)**: Coeficiente de media móvil estacional
+- **σ²**: Varianza del error
+
+**Métricas de Evaluación:**
+- MAE (Error Absoluto Medio)
+- RMSE (Raíz del Error Cuadrático Medio)
+- MAPE (Error Porcentual Absoluto Medio)
+- AIC/BIC (Criterios de información)
+
+**Salidas generadas:**
+- `sarima_forecast.png`: 3 gráficos de análisis
+  1. Serie temporal histórica vs pronóstico con intervalos de confianza
+  2. Residuos del modelo
+  3. Distribución de residuos
+- `sarima_diagnostics.png`: Diagnóstico del modelo
+  1. ACF de residuos
+  2. PACF de residuos
+  3. Q-Q Plot
+  4. Residuos estandarizados
+- `sarima_results.csv`: Valores históricos, ajustados y residuos
+- `sarima_forecast.csv`: Pronósticos con intervalos de confianza (12 periodos)
+
+```bash
+python ForecastModels\SARIMA\sarima_forecast.py
+```
+
+**Interpretación de Resultados:**
+
+El modelo SARIMA identificó:
+- **Test ADF**: Serie estacionaria (p-valor = 0.0009)
+- **Componente AR estacional (Φ₁)**: ~0.56 (correlación positiva con mismo mes del año anterior)
+- **Estacionalidad**: Capturada mediante componentes SAR y SMA
+- **Precisión (MAPE)**: ~41% (menor precisión debido a la serie corta de 29 meses)
+
+**Nota**: SARIMA requiere idealmente 3-5 ciclos estacionales completos (36-60 meses) para estimaciones óptimas. Con solo 29 meses disponibles, el modelo tiene limitaciones pero sigue siendo útil para comparación metodológica.
+
 #### Comparación de Modelos
 
-| Métrica | Holt-Winters | Prophet |
-|---------|--------------|---------|
-| **MAPE** | 31,54% | **13,39%** ✅ |
-| **MAE** | $36.298 | **$12.567** ✅ |
-| **RMSE** | $55.808 | **$18.373** ✅ |
-| **Total Pronóstico (12 meses)** | $2.776.620 | $2.417.382 |
-| **Intervalos de Confianza** | No | Sí (95%) |
+| Métrica | Holt-Winters | Prophet | SARIMA |
+|---------|--------------|---------|--------|
+| **MAPE** | 31,54% | **13,39%** ✅ | 41,48% |
+| **MAE** | $36.298 | **$12.567** ✅ | $76.395 |
+| **RMSE** | $55.808 | **$18.373** ✅ | $134.129 |
+| **Total Pronóstico (12 meses)** | $2.776.620 | $2.417.382 | $2.421.953 |
+| **Intervalos de Confianza** | No | Sí (95%) | Sí (95%) |
+| **Criterios de Información** | No | No | Sí (AIC/BIC) |
+| **Datos mínimos recomendados** | 24 meses | 12 meses | 36-60 meses |
 
-**Conclusión**: Prophet muestra mejor precisión en este dataset debido a su capacidad de detectar múltiples puntos de cambio en la tendencia y su robustez con series temporales cortas.
+**Conclusión**: Prophet muestra la mejor precisión en este dataset debido a su capacidad de detectar múltiples puntos de cambio en la tendencia y su robustez con series temporales cortas. Holt-Winters ofrece un balance entre simplicidad e interpretabilidad. SARIMA, aunque menos preciso con pocos datos, proporciona diagnósticos estadísticos rigurosos y es preferido cuando se dispone de series más largas.
 
 ### 4. Análisis de Demanda de Componentes
 
@@ -303,13 +383,176 @@ python DemandaComponentes.py
    ├─> python Analisis/ABC_analysis.py
    └─> python Analisis/XYZ_analisis.py
 
-4. Pronóstico de Ventas (elegir uno o ambos)
+4. Pronóstico de Ventas (elegir uno o varios)
    ├─> python ForecastModels/Holt-Winters/winters_forecast.py
-   └─> python ForecastModels/Prophet/prophet_forecast.py
+   ├─> python ForecastModels/Prophet/prophet_forecast.py
+   └─> python ForecastModels/SARIMA/sarima_forecast.py
 
 5. Cálculo de Demanda de Componentes
    └─> python DemandaComponentes.py
 ```
+
+---
+
+## 🚶 Guía Paso a Paso de Ejecución
+
+Esta sección detalla cómo ejecutar cada componente del proyecto en orden.
+
+### Paso 0: Configuración Inicial (Solo la primera vez)
+
+```powershell
+# 1. Clonar el repositorio (si no lo tienes)
+git clone https://github.com/JuanBrun/RepoProyectoIO.git
+cd RepoProyectoIO
+
+# 2. Crear entorno virtual
+python -m venv .venv
+
+# 3. Activar entorno virtual (Windows PowerShell)
+.venv\Scripts\Activate.ps1
+
+# 4. Instalar todas las dependencias
+pip install pandas numpy matplotlib statsmodels prophet
+```
+
+### Paso 1: Preparación y Limpieza de Datos
+
+**Objetivo**: Limpiar el dataset original y filtrar solo los datos relevantes.
+
+```powershell
+# Ejecutar script de limpieza
+python "TPFinal IO/dataset IO.py"
+```
+
+**Resultado**: Genera `sales_data_sample_clean.csv` con solo:
+- Órdenes con STATUS = 'Shipped'
+- Productos: Classic Cars y Vintage Cars
+
+### Paso 2: Generar Serie Temporal de Ventas
+
+**Objetivo**: Agregar las ventas por mes para análisis temporal.
+
+```powershell
+python VentasPorMes.py
+```
+
+**Resultado**: 
+- Genera `ventaspormes.csv`
+- Muestra en consola las ventas por mes de cada tipo de vehículo
+
+### Paso 3: Análisis ABC de Inventario
+
+**Objetivo**: Clasificar componentes por valor económico (Principio de Pareto).
+
+```powershell
+python Analisis/ABC_analysis.py
+```
+
+**Resultado**: Muestra en consola:
+- Tabla de componentes ordenados por valor total
+- Clasificación ABC (A: 80%, B: 15%, C: 5%)
+- Porcentaje acumulado de cada componente
+
+### Paso 4: Análisis XYZ de Variabilidad
+
+**Objetivo**: Clasificar componentes por variabilidad de demanda.
+
+```powershell
+python Analisis/XYZ_analisis.py
+```
+
+**Resultado**: Muestra en consola:
+- Coeficiente de variación (CV) de cada componente
+- Clasificación XYZ (X: ≤10%, Y: 10-25%, Z: >25%)
+- Promedio mensual y desviación estándar
+
+### Paso 5: Pronóstico con Holt-Winters
+
+**Objetivo**: Predecir ventas futuras usando suavización exponencial triple.
+
+```powershell
+python ForecastModels/Holt-Winters/winters_forecast.py
+```
+
+**Resultado**:
+- `winters_forecast.png` - Gráficos de análisis (4 paneles)
+- `winters_forecast.csv` - Pronósticos para 12 meses
+- `winters_results.csv` - Valores históricos y ajustados
+- Métricas en consola: MAE, RMSE, MAPE
+
+### Paso 6: Pronóstico con Prophet
+
+**Objetivo**: Predecir ventas futuras con el modelo de Facebook/Meta.
+
+```powershell
+python ForecastModels/Prophet/prophet_forecast.py
+```
+
+**Resultado**:
+- `prophet_forecast.png` - Gráficos de análisis (3 paneles)
+- `prophet_components.png` - Descomposición de componentes
+- `prophet_forecast.csv` - Pronósticos con intervalos de confianza
+- `prophet_results.csv` - Valores históricos y ajustados
+- Métricas en consola: MAE, RMSE, MAPE
+
+### Paso 7: Pronóstico con SARIMA
+
+**Objetivo**: Predecir ventas futuras con el modelo estadístico SARIMA.
+
+```powershell
+python ForecastModels/SARIMA/sarima_forecast.py
+```
+
+**Resultado**:
+- `sarima_forecast.png` - Gráficos de análisis (3 paneles)
+- `sarima_diagnostics.png` - Diagnóstico del modelo (ACF, PACF, Q-Q Plot)
+- `sarima_forecast.csv` - Pronósticos con intervalos de confianza
+- `sarima_results.csv` - Valores históricos y ajustados
+- Métricas en consola: MAE, RMSE, MAPE, AIC, BIC
+
+### Paso 8: Análisis de Demanda de Componentes
+
+**Objetivo**: Visualizar la demanda mensual de cada componente.
+
+```powershell
+python DemandaComponentes.py
+```
+
+**Resultado**:
+- Gráfico interactivo con demanda de componentes Vintage Cars
+- Gráfico interactivo con demanda de componentes Classic Cars
+
+### Ejecución Completa (Todos los pasos)
+
+Para ejecutar todo el análisis de una vez:
+
+```powershell
+# Activar entorno virtual
+.venv\Scripts\Activate.ps1
+
+# Ejecutar en orden
+python "TPFinal IO/dataset IO.py"
+python VentasPorMes.py
+python Analisis/ABC_analysis.py
+python Analisis/XYZ_analisis.py
+python ForecastModels/Holt-Winters/winters_forecast.py
+python ForecastModels/Prophet/prophet_forecast.py
+python ForecastModels/SARIMA/sarima_forecast.py
+python DemandaComponentes.py
+```
+
+### Resumen de Archivos Generados
+
+| Paso | Script | Archivos Generados |
+|------|--------|-------------------|
+| 1 | `dataset IO.py` | `sales_data_sample_clean.csv` |
+| 2 | `VentasPorMes.py` | `ventaspormes.csv` |
+| 3 | `ABC_analysis.py` | (salida en consola) |
+| 4 | `XYZ_analisis.py` | (salida en consola) |
+| 5 | `winters_forecast.py` | `winters_forecast.png`, `winters_forecast.csv`, `winters_results.csv` |
+| 6 | `prophet_forecast.py` | `prophet_forecast.png`, `prophet_components.png`, `prophet_forecast.csv`, `prophet_results.csv` |
+| 7 | `sarima_forecast.py` | `sarima_forecast.png`, `sarima_diagnostics.png`, `sarima_forecast.csv`, `sarima_results.csv` |
+| 8 | `DemandaComponentes.py` | (gráficos interactivos) |
 
 ---
 
@@ -344,15 +587,17 @@ Representan la mayor inversión en inventario (Clase A).
 2. **Análisis XYZ**: Coeficiente de variación estadístico
 3. **Suavización Exponencial**: Modelo Holt-Winters triple
 4. **Prophet**: Modelo aditivo generalizado de Facebook/Meta
-5. **Series Temporales**: Descomposición en tendencia, estacionalidad y ruido
+5. **SARIMA**: Modelo autorregresivo integrado de media móvil estacional
+6. **Series Temporales**: Descomposición en tendencia, estacionalidad y ruido
 
 ### Herramientas
 - **Python 3.13**: Lenguaje de programación
 - **Pandas**: Manipulación de datos tabulares
 - **NumPy**: Operaciones numéricas eficientes
 - **Matplotlib**: Generación de gráficos profesionales
-- **Statsmodels**: Modelos estadísticos avanzados (Holt-Winters)
+- **Statsmodels**: Modelos estadísticos avanzados (Holt-Winters, SARIMA)
 - **Prophet**: Modelo de pronóstico de Facebook/Meta
+- **SciPy**: Análisis estadístico (Q-Q plots, tests)
 
 ---
 
@@ -397,6 +642,14 @@ Periodo,Pronostico,Limite_Inferior,Limite_Superior
 ...
 ```
 
+**`sarima_forecast.csv`**: Pronósticos con intervalos de confianza (SARIMA)
+```csv
+Periodo,Pronostico,Limite_Inferior,Limite_Superior
+2005-06-01,102517.48,-202830.74,407865.70
+2005-07-01,196861.66,-109700.28,503423.59
+...
+```
+
 ---
 
 ## 🤝 Contribuciones
@@ -406,7 +659,7 @@ Este proyecto fue desarrollado como trabajo final para la materia Investigación
 ### Responsabilidades del Equipo
 - **Análisis de datos y limpieza**: Dataset IO, exploración inicial
 - **Modelos de clasificación**: Implementación ABC-XYZ
-- **Modelos de pronóstico**: Holt-Winters, Prophet, validación estadística
+- **Modelos de pronóstico**: Holt-Winters, Prophet, SARIMA, validación estadística
 - **Visualización y reportes**: Gráficos, documentación, presentación
 
 ---

@@ -101,9 +101,48 @@ try:
     # Mostrar parámetros del modelo
     print(f"\n  Parámetros del modelo:")
     print(f"    Modo de estacionalidad:    {'Aditivo' if model.seasonality_mode == 'additive' else 'Multiplicativo'}")
-    print(f"    Estacionalidad anual:      {'Sí' if model.yearly_seasonality else 'No'}")
+    print(f"    Estacionalidad anual:      {'Si' if model.yearly_seasonality else 'No'}")
     print(f"    Puntos de cambio detectados: {len(model.changepoints)}")
     print(f"    Intervalo de confianza:    95%")
+    
+    # === PARÁMETROS INTERNOS DEL MODELO ===
+    # Prophet usa: y(t) = g(t) + s(t) + h(t) + epsilon
+    # Donde: g(t)=tendencia, s(t)=estacionalidad, h(t)=festivos, epsilon=ruido
+    print("\n--- Parametros internos del modelo Prophet ---")
+    print("    Modelo: y(t) = g(t) + s(t) + epsilon")
+    
+    params = model.params
+    
+    # Parámetros de tendencia g(t)
+    k_val = float(np.array(params['k']).flatten()[0])
+    m_val = float(np.array(params['m']).flatten()[0])
+    print(f"\n  [TENDENCIA] g(t) = k*t + m + sum(delta*a(t))")
+    print(f"    k (pendiente inicial):       {k_val:.6f}")
+    print(f"    m (intercepto/offset):       {m_val:.6f}")
+    
+    # Deltas (cambios en puntos de quiebre)
+    deltas = np.array(params['delta']).flatten()
+    print(f"    delta (cambios de pendiente): {len(deltas)} valores")
+    non_zero_deltas = [(i+1, float(d)) for i, d in enumerate(deltas) if abs(d) > 0.0001]
+    if non_zero_deltas:
+        print(f"    Deltas significativos (|d| > 0.0001):")
+        for idx, d in non_zero_deltas[:5]:
+            print(f"      delta_{idx}: {d:.6f}")
+        if len(non_zero_deltas) > 5:
+            print(f"      ... ({len(non_zero_deltas) - 5} mas)")
+    
+    # Parámetros de estacionalidad s(t) - Coeficientes de Fourier
+    beta = np.array(params['beta']).flatten()
+    print(f"\n  [ESTACIONALIDAD] s(t) = sum(beta * Fourier)")
+    print(f"    Terminos de Fourier:         {len(beta)//2} pares (sen/cos)")
+    print(f"    Coeficientes beta:")
+    for i, b in enumerate(beta):
+        print(f"      beta_{i+1}: {float(b):.6f}")
+    
+    # Parámetro de ruido
+    sigma = float(np.array(params['sigma_obs']).flatten()[0])
+    print(f"\n  [RUIDO] epsilon ~ N(0, sigma)")
+    print(f"    sigma_obs:                   {sigma:.6f}")
     
     # === 6. PRONÓSTICO ===
     # Pronosticar los próximos 12 meses
