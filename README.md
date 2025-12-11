@@ -1,8 +1,34 @@
 # Proyecto Final - Investigación Operativa
 
+<div align="center">
+
+![Operations Research](https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif)
+
+*"Optimizando decisiones, un algoritmo a la vez"* 🎯
+
+[![Python](https://img.shields.io/badge/Python-3.13-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Pandas](https://img.shields.io/badge/Pandas-2.3-150458?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org)
+[![Status](https://img.shields.io/badge/Status-En%20Proceso-yellow?style=for-the-badge)]()
+[![UTN](https://img.shields.io/badge/UTN-FRCU-red?style=for-the-badge)]()
+
+</div>
+
+---
+
 **Universidad Tecnológica Nacional - Facultad Regional Concepción del Uruguay**  
 **Ingeniería en Sistemas de Información - 4to Año**  
 **Materia:** Investigación Operativa
+
+<div align="center">
+
+| 📊 Pronósticos | 📈 Análisis | 🎓 Investigación |
+|:---:|:---:|:---:|
+| ![Forecast](https://media.giphy.com/media/l46Cy1rHbQ92uuLXa/giphy.gif) | ![Analysis](https://media.giphy.com/media/3oKIPEqDGUULpEU0aQ/giphy.gif) | ![Study](https://media.giphy.com/media/IPbS5R4fSUl5S/giphy.gif) |
+| *Holt-Winters, Prophet, SARIMA* | *ABC-XYZ Classification* | *Café + Código = TP* |
+
+</div>
+
+---
 
 ## 👥 Equipo de Desarrollo
 
@@ -680,3 +706,29 @@ Para consultas sobre el proyecto:
 ---
 
 **Fecha de última actualización**: Diciembre 2025
+
+---
+
+<div align="center">
+
+## 🎓 ¡Gracias por visitar nuestro proyecto!
+
+*"Al finalizar todo este trabajo..."*
+
+| 🧠 Lo que aprendimos | 🧉 Mate consumido | 🐛 Bugs encontrados |
+|:---:|:---:|:---:|
+| Mucho | Demasiado | No queremos hablar de eso |
+
+![ThankYou](https://media.giphy.com/media/3oz8xIsloV7zOmt81G/giphy.gif)
+
+**¿Te gustó el proyecto? ¡Dale una ⭐ al repositorio!**
+
+[![Made with Love](https://img.shields.io/badge/Made%20with-❤️%20y%20mate-red?style=for-the-badge)]()
+
+---
+
+*UTN FRCU - Ingeniería en Sistemas - 2025*
+
+*"La optimización es el arte de hacer lo mejor posible con lo que se tiene... incluyendo las horas de sueño"* 😴
+
+</div>
