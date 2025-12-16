@@ -1,0 +1,23 @@
+# ==========================================
+# Proyecto Investigación Operativa - UTN FRCU
+# Dependencias Python
+# ==========================================
+# Instalar con: pip install -r requirements.txt
+
+# Manipulación de datos
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Visualización
+matplotlib>=3.7.0
+
+# Modelos estadísticos
+statsmodels>=0.14.0
+scipy>=1.10.0
+
+# Prophet (pronóstico avanzado)
+prophet>=1.1.0
+
+# Opcional: para desarrollo
+# jupyter>=1.0.0
+# ipykernel>=6.0.0
