@@ -29,7 +29,7 @@ print("="*60)
 script_dir = os.path.dirname(__file__) or os.getcwd()
 project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
 data_dir = os.path.join(project_root, 'data')
-output_dir = os.path.join(project_root, 'outputs', 'forecast')
+output_dir = os.path.join(project_root, 'outputs', 'forecast', 'prophet')
 
 # Asegurar que existe el directorio de salida
 os.makedirs(output_dir, exist_ok=True)
@@ -59,9 +59,33 @@ monthly_sales = df.groupby('PERIOD')['SALES'].sum().sort_index()
 # Convertir índice Period a Timestamp para compatibilidad
 monthly_sales.index = monthly_sales.index.to_timestamp()
 
+
 print(f"[OK] Datos agregados por mes: {len(monthly_sales)} periodos")
 print(f"  Rango temporal: {monthly_sales.index.min()} a {monthly_sales.index.max()}")
 print(f"  Total ventas: ${monthly_sales.sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+# === CÁLCULO DE MEDIANA Y PROPORCIÓN DE VEHÍCULOS ===
+print("\n--- Cálculo de mediana y proporciones de vehículos ---")
+
+# Calcular valor unitario de cada auto
+df = df[df['QUANTITYORDERED'] > 0].copy()
+df['VALOR_UNITARIO_AUTO'] = df['SALES'] / df['QUANTITYORDERED']
+
+# Expandir cada fila según la cantidad de autos
+valores_unitarios = np.repeat(df['VALOR_UNITARIO_AUTO'].values, df['QUANTITYORDERED'].values.astype(int))
+mediana_valor = np.median(valores_unitarios)
+autos_sobre_mediana = np.sum(valores_unitarios > mediana_valor)
+autos_bajo_mediana = np.sum(valores_unitarios <= mediana_valor)
+total_autos = len(valores_unitarios)
+print(f"Mediana del valor de los vehículos: ${mediana_valor:,.2f}")
+print(f"Autos sobre la mediana: {autos_sobre_mediana}")
+print(f"Autos bajo o igual a la mediana: {autos_bajo_mediana}")
+
+# Proporciones
+proporcion_sobre = autos_sobre_mediana / total_autos if total_autos > 0 else 0
+proporcion_bajo = autos_bajo_mediana / total_autos if total_autos > 0 else 0
+print(f"Proporción sobre mediana: {proporcion_sobre:.2%}")
+print(f"Proporción bajo o igual a mediana: {proporcion_bajo:.2%}")
 
 # === 3. PREPARAR DATOS PARA PROPHET ===
 # Prophet requiere un DataFrame con columnas 'ds' (fecha) y 'y' (valor)
@@ -196,7 +220,7 @@ try:
     
     formatted_total = f"${future_forecast['yhat'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
     print(f"\n{'TOTAL PRONOSTICADO:'} {formatted_total}")
-    
+
     # === 9. VISUALIZACIONES ===
     print("\n--- Generando gráficos ---")
     
@@ -299,17 +323,46 @@ try:
     })
     
     # DataFrame de pronósticos
+
+    # Definir parámetros de autos
+    PRECIO_PROMEDIO_AUTO = 3500
+    PROPORCION_CLASSIC = 0.65
+    PROPORCION_VINTAGE = 0.35
+
     forecast_export_df = pd.DataFrame({
         'Periodo': future_forecast['ds'],
         'Pronostico': future_forecast['yhat'].values,
         'Limite_Inferior': future_forecast['yhat_lower'].values,
         'Limite_Superior': future_forecast['yhat_upper'].values
     })
+
+    # Calcular cantidad de autos clásicos y vintage por periodo
+    forecast_export_df['Autos_Clasicos'] = forecast_export_df['Pronostico'] / PRECIO_PROMEDIO_AUTO * PROPORCION_CLASSIC
+    forecast_export_df['Autos_Vintage'] = forecast_export_df['Pronostico'] / PRECIO_PROMEDIO_AUTO * PROPORCION_VINTAGE
+
+    # Redondear a enteros si se desea cantidad de autos
+    forecast_export_df['Autos_Clasicos'] = forecast_export_df['Autos_Clasicos'].round(0)
+    forecast_export_df['Autos_Vintage'] = forecast_export_df['Autos_Vintage'].round(0)
+
+    # Agregar fila de totales
+    total_row = {
+        'Periodo': 'TOTAL',
+        'Pronostico': forecast_export_df['Pronostico'].sum(),
+        'Limite_Inferior': forecast_export_df['Limite_Inferior'].sum(),
+        'Limite_Superior': forecast_export_df['Limite_Superior'].sum(),
+        'Autos_Clasicos': forecast_export_df['Autos_Clasicos'].sum(),
+        'Autos_Vintage': forecast_export_df['Autos_Vintage'].sum()
+    }
+    forecast_export_df = pd.concat([forecast_export_df, pd.DataFrame([total_row])], ignore_index=True)
+
+    # === 8.1. CALCULAR AUTOS CLÁSICOS Y VINTAGE POR PERIODO ===
+    PRECIO_PROMEDIO_AUTO = 3500
+    PROPORCION_CLASSIC = 0.65
+    PROPORCION_VINTAGE = 0.35
     
     # Exportar a CSV
     results_path = os.path.join(output_dir, 'prophet_results.csv')
     results_df.to_csv(results_path, index=False)
-    
     forecast_path = os.path.join(output_dir, 'prophet_forecast.csv')
     forecast_export_df.to_csv(forecast_path, index=False)
     

@@ -22,17 +22,19 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-print("""
-Z_ALPHA = stats.norm.ppf(1 - ALPHA)  # 1.645
 
-print(f"  Costo de ordenar (S):      ${COSTO_ORDENAR:,.2f} por orden".replace(',', 'X').replace('.', ',').replace('X', '.'))
-print(f"  Tasa de mantenimiento:     {TASA_MANTENIMIENTO*100:.0f}% anual del costo unitario")
-print(f"  Nivel de servicio (1-alpha):   {(1-ALPHA)*100:.0f}%")
-print(f"  Z-score (alpha=0.05):          {Z_ALPHA:.4f}")
-print(f"  Z-score (alpha=0.05):          {Z_ALPHA:.4f}")
-print(f"  Z-score (alpha=0.05):          {Z_ALPHA:.4f}")
+# Parámetro de tasa de mantenimiento anual (20% del costo unitario)
+TASA_MANTENIMIENTO = 0.20
+# Costo de ordenar por pedido
+COSTO_ORDENAR = 300
+# Z-score para nivel de servicio 95%
+Z_ALPHA = 1.645
 
-# === 2. CATÁLOGO DE COMPONENTES ===
+# Definir rutas necesarias antes de usarlas
+script_dir = os.path.dirname(__file__) or os.getcwd()
+project_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
+output_dir = os.path.join(project_root, 'outputs', 'inventory')
+forecast_dir = os.path.join(project_root, 'outputs', 'forecast')
 componentes = pd.DataFrame({
     'Componente': [
         'Motor de Alto Rendimiento V8',
@@ -44,14 +46,15 @@ componentes = pd.DataFrame({
         'Tapicería de Cuero Premium',
         'Juego de Llantas Vintage Espec.',
         'Llantas Regulares Cromados',
-        'Cubiertas de Alta Gama (Neumáticos)'
+        'Cubiertas de Alta Gama (Neumáticos)',
+        'Componente Genérico'
     ],
     'Auto_Foco': [
         'Clásico', 'Vintage', 'Vintage', 'Clásico', 'Ambos',
         'Clásico', 'Vintage', 'Ambos', 'Vintage', 'Clásico', 'Ambos'
     ],
     'Costo_Unitario': [
-        9000, 12000, 15000, 6500, 3500, 
+        9000, 12000, 15000, 6500, 3500,
         1200, 900, 4000, 2500, 400, 250
     ],
     'Uso_por_Auto': [
@@ -68,14 +71,17 @@ componentes = pd.DataFrame({
 # === 3. CARGAR Y SEGMENTAR PRONÓSTICO PROPHET ===
 print("\n--- Cargando y segmentando pronóstico Prophet ---")
 
-prophet_results_path = os.path.join(forecast_dir, 'prophet_results.csv')
-prophet_forecast_path = os.path.join(forecast_dir, 'prophet_forecast.csv')
+prophet_results_path = os.path.join(forecast_dir, 'prophet', 'prophet_results.csv')
+prophet_forecast_path = os.path.join(forecast_dir, 'prophet', 'prophet_forecast.csv')
 
 if not os.path.exists(prophet_results_path):
     raise SystemExit(f"Error: No se encontró {prophet_results_path}\nEjecuta primero: python src/forecast/prophet_forecast.py")
 
 df_historico = pd.read_csv(prophet_results_path)
+
 df_pronostico = pd.read_csv(prophet_forecast_path)
+# Filtrar filas no numéricas (como 'TOTAL') antes de procesar fechas
+df_pronostico = df_pronostico[pd.to_datetime(df_pronostico['Periodo'], errors='coerce').notnull()].copy()
 
 # Función para calcular CV
 def calcular_cv(datos):
@@ -303,30 +309,6 @@ cte_anual_estacional = cte_pico_total + cte_normal_total
 print(f"\n{'CTE TOTAL ANUAL (PICO + NORMAL):':<55} ${cte_anual_estacional:>12,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
 # === 8. COMPARACIÓN CON EOQ SIN ESTACIONALIDAD ===
-print("\n" + "="*70)
-print("COMPARACIÓN: EOQ ESTACIONAL vs EOQ CLÁSICO")
-print("="*70)
-
-# Cargar resultados del EOQ clásico si existen
-politica_a_path = os.path.join(output_dir, 'politica_a_resultados.csv')
-if os.path.exists(politica_a_path):
-    df_clasico = pd.read_csv(politica_a_path)
-    cte_clasico_total = df_clasico['CTE'].sum()
-    
-    diferencia = cte_anual_estacional - cte_clasico_total
-    porcentaje = (diferencia / cte_clasico_total) * 100
-    
-    print(f"\n  {'Modelo':<35} {'CTE Total ($)':<20}")
-    print("-" * 55)
-    print(f"  {'EOQ Clásico (demanda constante)':<35} ${cte_clasico_total:>18,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    print(f"  {'EOQ Estacional (PICO + NORMAL)':<35} ${cte_anual_estacional:>18,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    print(f"  {'Diferencia':<35} ${diferencia:>18,.2f} ({porcentaje:>+.2f}%)".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    print(f"\n  Nota: El EOQ estacional ajusta las cantidades de pedido según")
-    print(f"        la demanda real de cada temporada, cumpliendo con CV < 0.20")
-else:
-    print("\n  [WARNING] No se encontro archivo de EOQ clasico para comparar")
-    print(f"     CTE Estacional calculado: ${cte_anual_estacional:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
 # === 9. POLÍTICA B - CON STOCK DE SEGURIDAD ===
 print("\n" + "="*70)
@@ -439,27 +421,18 @@ print("\n" + "="*70)
 print("RESUMEN COMPARATIVO - TODAS LAS POLÍTICAS")
 print("="*70)
 
-print(f"""
-╔═══════════════════════════════════════════════════════════════════════╗
-║              EOQ ESTACIONAL (CV validado por Winston)                  ║
-╠═══════════════════════════════════════════════════════════════════════╣
-║                                                                        ║
-║  ESTACIÓN PICO (Oct-Nov, 2 meses)                                      ║
-║    CV = {cv_pico:.4f} < 0.20 (EOQ valido)                                    ║
-║    Política A (sin SS):  ${cte_pico_total:>12,.2f}                            ║
-║    Política B (con SS):  ${cte_pico_b:>12,.2f}                            ║
-║                                                                        ║
-║  ESTACIÓN NORMAL (resto, 10 meses)                                     ║
-║    CV = {cv_normal:.4f} < 0.20 (EOQ valido)                                   ║
-║    Política A (sin SS):  ${cte_normal_total:>12,.2f}                            ║
-║    Política B (con SS):  ${cte_normal_b:>12,.2f}                            ║
-║                                                                        ║
-╠═══════════════════════════════════════════════════════════════════════╣
-║  TOTALES ANUALES                                                       ║
-║    Política A Estacional:  ${cte_anual_estacional:>12,.2f}                            ║
-║    Política B Estacional:  ${cte_anual_b:>12,.2f}                            ║
-╚═══════════════════════════════════════════════════════════════════════╝
-""".replace(',', 'X').replace('.', ',').replace('X', '.'))
+print("\nRESUMEN EOQ ESTACIONAL (CV validado por Winston)")
+print(f"  ESTACIÓN PICO (Oct-Nov, 2 meses):")
+print(f"    CV = {cv_pico:.4f} < 0.20 (EOQ valido)")
+print(f"    Política A (sin SS):  ${cte_pico_total:>12,.2f}")
+print(f"    Política B (con SS):  ${cte_pico_b:>12,.2f}")
+print(f"  ESTACIÓN NORMAL (resto, 10 meses):")
+print(f"    CV = {cv_normal:.4f} < 0.20 (EOQ valido)")
+print(f"    Política A (sin SS):  ${cte_normal_total:>12,.2f}")
+print(f"    Política B (con SS):  ${cte_normal_b:>12,.2f}")
+print(f"  TOTALES ANUALES:")
+print(f"    Política A Estacional:  ${cte_anual_estacional:>12,.2f}")
+print(f"    Política B Estacional:  ${cte_anual_b:>12,.2f}")
 
 # === 11. EXPORTAR RESULTADOS ===
 print("\n--- Exportando resultados ---")
@@ -523,13 +496,8 @@ ax4 = axes[1, 1]
 labels = ['EOQ Estacional\nPolítica A', 'EOQ Estacional\nPolítica B']
 valores_total = [cte_anual_estacional, cte_anual_b]
 
-# Si existe EOQ clásico, agregarlo
-if os.path.exists(politica_a_path):
-    labels.insert(0, 'EOQ Clásico\n(sin estaciones)')
-    valores_total.insert(0, cte_clasico_total)
-    colores_total = ['gray', 'forestgreen', 'darkgreen']
-else:
-    colores_total = ['forestgreen', 'darkgreen']
+
+colores_total = ['forestgreen', 'darkgreen']
 
 bars = ax4.bar(labels, valores_total, color=colores_total)
 ax4.set_ylabel('CTE Total Anual ($)')

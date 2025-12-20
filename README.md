@@ -38,7 +38,6 @@ Este proyecto implementa un **sistema completo de gestión de inventario** para 
 ### Objetivos
 - ✅ **Análisis ABC/XYZ** de componentes por valor e importancia
 - ✅ **Pronóstico de demanda** con 3 modelos comparados
-- ✅ **Políticas de inventario EOQ** con validación estadística
 - ✅ **EOQ Estacional** adaptado para demanda variable
 
 
@@ -75,7 +74,6 @@ RepoProyectoIO/
 │   │   └── sarima_forecast.py        # SARIMA (MAPE 41.48%)
 │   │
 │   └── 📂 inventory/                 # Políticas de inventario
-│       ├── eoq_politicas.py          # EOQ Clásico + validación CV
 │       ├── eoq_estacional.py         # EOQ por temporadas ⭐
 │       ├── analisis_cv_periodos.py   # Análisis de CV por períodos
 
@@ -86,7 +84,6 @@ RepoProyectoIO/
 │   │   ├── 📂 winters/               # Outputs Holt-Winters (csv, png)
 │   │   └── 📂 sarima/                # Outputs SARIMA (csv, png)
 │   ├── 📂 inventory/
-│   │   ├── 📂 eoq_clasico/           # Resultados EOQ clásico
 │   │   ├── 📂 eoq_estacional/        # Resultados EOQ estacional
 │   │   ├── 📂 cv/                    # Análisis de coeficiente de variación
 │   │   └── 📂 comparacion/           # Comparaciones y gráficos
@@ -183,7 +180,6 @@ Los scripts deben ejecutarse en este orden específico:
 │  └── sarima_forecast.py                                     │
 ├─────────────────────────────────────────────────────────────┤
 │  PASO 4: Políticas de Inventario                            │
-│  ├── eoq_politicas.py      ← Requiere prophet_forecast     │
 │  ├── eoq_estacional.py     ← RECOMENDADO                   │
 │  └── silver_meal.py                                         │
 
@@ -210,7 +206,6 @@ python src/forecast/winters_forecast.py
 python src/forecast/sarima_forecast.py
 
 # 5. Políticas de Inventario
-python src/inventory/eoq_politicas.py      # EOQ clásico (valida CV)
 python src/inventory/eoq_estacional.py     # ⭐ EOQ estacional (RECOMENDADO)
 
 ```
@@ -288,48 +283,21 @@ Parámetros Prophet:
 > **Referencia**: Winston - *Investigación de Operaciones*, pág. 872-873  
 > Método de Peterson y Silver (1998)
 
-El modelo EOQ clásico es válido **solo si CV < 0.20**. En nuestro caso:
-
-| Métrica | Valor | ¿Válido para EOQ? |
-|---------|-------|-------------------|
-| CV Anual | 0.4446 | ❌ No (≥ 0.20) |
-| CV Temporada PICO (Oct-Nov) | 0.0919 | ✅ Sí (< 0.20) |
-| CV Temporada NORMAL (resto) | 0.0716 | ✅ Sí (< 0.20) |
-
-### Solución: EOQ Estacional
-
-Al dividir el año en **2 estaciones** con CV < 0.20, el modelo EOQ se vuelve válido:
-
-```
-Estaciones definidas:
-├── PICO: Octubre - Noviembre
-│   └── CV = 0.0919 ✓
-└── NORMAL: Enero-Septiembre, Diciembre
-    └── CV = 0.0716 ✓
-```
 
 ### Comparación de Políticas
 
 | Política | Descripción | Costo Total Anual |
 |----------|-------------|-------------------|
-| **EOQ Clásico - Política A** | Optimización por costos | $164,059 |
-| **EOQ Clásico - Política B** | Nivel servicio 95% | $263,001 |
 | **EOQ Estacional - Política A** ⭐ | Por temporadas | $159,161 |
 | **EOQ Estacional - Política B** | Por temporadas + servicio | $206,709 |
 
-### 💰 Ahorro con EOQ Estacional
+### 💰 Resultados EOQ Estacional
 
-```
 Política A:
-  EOQ Clásico:    $164,059
   EOQ Estacional: $159,161
-  Ahorro:         $4,898 (-2.99%)
 
 Política B:
-  EOQ Clásico:    $263,001
   EOQ Estacional: $206,709
-  Ahorro:         $56,292 (-21.40%)
-```
 
 
 ---
