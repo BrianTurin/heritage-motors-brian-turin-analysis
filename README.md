@@ -1,18 +1,9 @@
-<div align="center">
-
 # 🚗 Proyecto de Investigación Operativa
 ## Análisis de Ventas y Gestión de Inventario - Vehículos Clásicos y Vintage
-
-[![Python](https://img.shields.io/badge/Python-3.13-blue?style=for-the-badge&logo=python)](https://python.org)
-[![UTN](https://img.shields.io/badge/UTN-FRCU-green?style=for-the-badge)](https://www.frcu.utn.edu.ar/)
-[![Status](https://img.shields.io/badge/Status-Completado-success?style=for-the-badge)]()
-[![Prophet](https://img.shields.io/badge/Prophet-MAPE%2013.39%25-orange?style=for-the-badge)]()
 
 ![Cars](https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif)
 
 *Trabajo Práctico Final - Ingeniería en Sistemas de Información*
-
-</div>
 
 ---
 
@@ -74,8 +65,8 @@ RepoProyectoIO/
 │   │   └── sarima_forecast.py        # SARIMA (MAPE 41.48%)
 │   │
 │   └── 📂 inventory/                 # Políticas de inventario
-│       ├── eoq_estacional.py         # EOQ por temporadas ⭐
-│       ├── analisis_cv_periodos.py   # Análisis de CV por períodos
+│       └── eoq_estacional.py         # EOQ estacional (costos y nivel de servicio)
+│       └── analisis_cv_periodos.py   # Análisis de CV por períodos
 
 │
 ├── 📂 outputs/                       # Resultados generados
@@ -220,6 +211,41 @@ python src/forecast/prophet_forecast.py
 python src/inventory/eoq_estacional.py
 Write-Host "Ejecución completada!" -ForegroundColor Green
 ```
+
+---
+
+## ⚙️ Automatización con Makefile
+
+Este proyecto incluye un **Makefile** para facilitar la ejecución de todos los scripts desde la terminal, sin tener que escribir rutas largas ni recordar comandos específicos.
+
+### ¿Cómo usarlo?
+
+1. **Asegúrate de tener el entorno virtual activado**
+2. **Desde la raíz del proyecto**, ejecuta los comandos con `make <tarea>`
+
+#### Principales comandos disponibles:
+
+- `make preprocesar-limpiar`            → Limpia y filtra el dataset original
+- `make preprocesar-ventas-mensuales`   → Genera la serie de ventas mensuales
+- `make pronostico-profeta`             → Ejecuta el modelo Prophet
+- `make pronostico-sarima`              → Ejecuta el modelo SARIMA
+- `make pronostico-winters`             → Ejecuta el modelo Holt-Winters
+- `make analisis-abc`                   → Análisis ABC (valor)
+- `make analisis-xyz`                   → Análisis XYZ (variabilidad)
+- `make analisis-componentes`           → Análisis de demanda por componente
+- `make inventario-eoq-estacional-costo`    → EOQ estacional (óptimo por costos)
+- `make inventario-eoq-estacional-servicio` → EOQ estacional (nivel de servicio)
+- `make inventario-cv-periodos`         → Análisis de CV por períodos
+
+#### Atajos útiles:
+
+- `make preprocesar`   → Ejecuta todos los scripts de preprocesamiento
+- `make pronostico`    → Ejecuta todos los modelos de pronóstico
+- `make analisis`      → Ejecuta todos los análisis ABC/XYZ/componentes
+- `make inventario`    → Ejecuta todos los scripts de inventario
+- `make todo`          → Ejecuta TODO el flujo completo del proyecto
+
+> **Nota:** Si usas Windows, instala [Make for Windows](http://gnuwin32.sourceforge.net/packages/make.htm) o usa el subsistema de Linux (WSL) para poder usar estos comandos.
 
 ---
 

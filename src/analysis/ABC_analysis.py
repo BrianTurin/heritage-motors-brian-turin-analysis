@@ -1,17 +1,8 @@
-# ============================
-# ANÁLISIS ABC DE INSUMOS POR VEHÍCULO
-# ============================
-"""
-ABC_analysis.py
-===============
-Análisis ABC (Pareto 80-20) para clasificar componentes por valor.
-Componentes A: ~80% del valor (críticos)
-Componentes B: ~15% del valor (importantes)
-Componentes C: ~5% del valor (numerosos)
-
-Entrada: data/sales_data_sample_clean.csv
-Salida:  outputs/analysis/analisis_ABC.csv (opcional)
-"""
+# ANÁLISIS ABC DE COMPONENTES
+# ---------------------------
+# Análisis ABC de componentes según valor de ventas.
+# Entradas: data/sales_data_sample_clean.csv
+# Salidas:  outputs/analysis/analisis_ABC.csv (opcional)
 
 import os
 import pandas as pd

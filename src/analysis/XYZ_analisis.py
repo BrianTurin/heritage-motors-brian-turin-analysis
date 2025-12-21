@@ -1,17 +1,8 @@
-# ============================
-# ANÁLISIS XYZ DE INSUMOS POR VEHÍCULO
-# ============================
-"""
-XYZ_analisis.py
-===============
-Análisis XYZ basado en Coeficiente de Variación (CV).
-Componentes X: CV < 10% (demanda estable)
-Componentes Y: CV 10-25% (demanda variable)
-Componentes Z: CV > 25% (demanda muy variable)
-
-Entrada: data/sales_data_sample_clean.csv
-Salida:  outputs/analysis/analisis_XYZ.csv (opcional)
-"""
+# ANÁLISIS XYZ DE COMPONENTES
+# ---------------------------
+# Análisis XYZ de componentes según variabilidad de demanda.
+# Entradas: data/sales_data_sample_clean.csv
+# Salidas:  outputs/analysis/analisis_XYZ.csv (opcional)
 
 import os
 import pandas as pd

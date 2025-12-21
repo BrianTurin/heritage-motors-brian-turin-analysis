@@ -1,27 +1,30 @@
-# ============================
-# POLÍTICAS DE INVENTARIO - EOQ ESTACIONAL
-# Cantidad Económica de Pedido por Temporadas
-# ============================
-"""
-eoq_estacional.py
-=================
-Modelo EOQ adaptado para demanda estacional (CV < 0.20 por temporada).
-Basado en Winston, pág. 872-873.
+# EOQ ESTACIONAL - POLÍTICAS DE INVENTARIO
+# ----------------------------------------
+# Modelo EOQ adaptado para demanda estacional (CV < 0.20 por temporada).
+# Basado en Winston, pág. 872-873.
+# - Estación PICO: Oct-Nov (CV = 0.0919 < 0.20)
+# - Estación NORMAL: Resto del año (CV = 0.0716 < 0.20)
+# - Recomendado cuando el CV anual >= 0.20.
+# Entradas: outputs/forecast/prophet_forecast.csv
+# Salidas:  outputs/inventory/eoq_estacional_*.csv, eoq_estacional_*.png
 
-Estación PICO: Oct-Nov (CV = 0.0919 < 0.20) (EOQ válido)
-Estación NORMAL: Resto del año (CV = 0.0716 < 0.20) (EOQ válido)
-
-Este es el modelo RECOMENDADO cuando el CV anual >= 0.20.
-
-Entrada: outputs/forecast/prophet_results.csv, prophet_forecast.csv
-Salida:  outputs/inventory/eoq_estacional_*.csv, eoq_estacional_*.png
-"""
 
 import os
+import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
+
+# --- Manejo de argumentos para definir 'modo' ---
+if len(sys.argv) > 2 and sys.argv[1] == '--modo':
+    modo = sys.argv[2].lower()
+    if modo not in ['costo', 'servicio']:
+        print("Error: El modo debe ser 'costo' o 'servicio'.")
+        sys.exit(1)
+else:
+    print("Uso: python eoq_estacional.py --modo [costo|servicio]")
+    sys.exit(1)
 
 # Parámetro de tasa de mantenimiento anual (20% del costo unitario)
 TASA_MANTENIMIENTO = 0.20
@@ -191,54 +194,99 @@ for idx, row in componentes.iterrows():
     H = C * TASA_MANTENIMIENTO  # Anual
     L = row['Lead_Time_Semanas']
     
-    # --- ESTACIÓN PICO ---
-    D_pico = calcular_demanda_componente_estacion(row, demanda_pico_clasicos, demanda_pico_vintage)
-    # EOQ con demanda real de la estación (NO anualizada)
-    Q_pico = calcular_eoq(D_pico, COSTO_ORDENAR, H)
-    # Número de pedidos durante la estación pico
-    N_pico = D_pico / Q_pico if Q_pico > 0 else 0
-    # Costo durante estación pico (proporcional)
-    CTE_pico = calcular_costo_total(D_pico, Q_pico, COSTO_ORDENAR, H * FRACCION_PICO)
-    # Demanda semanal y ROP
-    semanas_pico = MESES_EN_PICO * SEMANAS_POR_MES
-    demanda_semanal_pico = D_pico / semanas_pico if semanas_pico > 0 else 0
-    ROP_pico = demanda_semanal_pico * L
-    # Tiempo entre pedidos en semanas
-    tiempo_entre_pedidos_pico = semanas_pico / N_pico if N_pico > 0 else np.nan
-    resultados_pico.append({
-        'Componente': row['Componente'],
-        'Estacion': 'PICO',
-        'Demanda_Estacion': D_pico,
-        'EOQ': Q_pico,
-        'Num_Pedidos': N_pico,
-        'Tiempo_Entre_Pedidos_Semanas': tiempo_entre_pedidos_pico,
-        'Tiempo_Entre_Pedidos_Dias': tiempo_entre_pedidos_pico * 7 if not np.isnan(tiempo_entre_pedidos_pico) else np.nan,
-        'ROP': ROP_pico,
-        'CTE': CTE_pico,
-        'Costo_Unitario': C
-    })
-    # --- ESTACIÓN NORMAL ---
-    D_normal = calcular_demanda_componente_estacion(row, demanda_normal_clasicos, demanda_normal_vintage)
-    # EOQ con demanda real de la estación (NO anualizada)
-    Q_normal = calcular_eoq(D_normal, COSTO_ORDENAR, H)
-    N_normal = D_normal / Q_normal if Q_normal > 0 else 0
-    CTE_normal = calcular_costo_total(D_normal, Q_normal, COSTO_ORDENAR, H * FRACCION_NORMAL)
-    semanas_normal = MESES_EN_NORMAL * SEMANAS_POR_MES
-    demanda_semanal_normal = D_normal / semanas_normal if semanas_normal > 0 else 0
-    ROP_normal = demanda_semanal_normal * L
-    tiempo_entre_pedidos_normal = semanas_normal / N_normal if N_normal > 0 else np.nan
-    resultados_normal.append({
-        'Componente': row['Componente'],
-        'Estacion': 'NORMAL',
-        'Demanda_Estacion': D_normal,
-        'EOQ': Q_normal,
-        'Num_Pedidos': N_normal,
-        'Tiempo_Entre_Pedidos_Semanas': tiempo_entre_pedidos_normal,
-        'Tiempo_Entre_Pedidos_Dias': tiempo_entre_pedidos_normal * 7 if not np.isnan(tiempo_entre_pedidos_normal) else np.nan,
-        'ROP': ROP_normal,
-        'CTE': CTE_normal,
-        'Costo_Unitario': C
-    })
+    if modo == 'servicio':
+        # --- EOQ anual único ---
+        # Demanda mensual de cada componente (12 meses)
+        mask_clasico = (row['Auto_Foco'] == 'Clásico')
+        mask_vintage = (row['Auto_Foco'] == 'Vintage')
+        mask_ambos = (row['Auto_Foco'] == 'Ambos')
+        if mask_clasico:
+            demanda_mensual = df_pronostico['Autos_Clasicos'] * row['Uso_por_Auto']
+        elif mask_vintage:
+            demanda_mensual = df_pronostico['Autos_Vintage'] * row['Uso_por_Auto']
+        elif mask_ambos:
+            demanda_mensual = (df_pronostico['Autos_Clasicos'] + df_pronostico['Autos_Vintage']) * row['Uso_por_Auto']
+        else:
+            demanda_mensual = pd.Series([0]*12)
+        D_anual = demanda_mensual.sum()
+        sigma_mensual = demanda_mensual.std(ddof=0)
+        Q = calcular_eoq(D_anual, COSTO_ORDENAR, H)
+        N = D_anual / Q if Q > 0 else 0
+        # Para cada estación, calcular demanda y SS
+        for estacion, meses_estacion, fraccion, nombre_estacion in [
+            ('PICO', MESES_PICO, FRACCION_PICO, 'PICO'),
+            ('NORMAL', MESES_NORMAL, FRACCION_NORMAL, 'NORMAL')]:
+            D_est = demanda_mensual[df_pronostico['Mes'].isin(meses_estacion)].sum()
+            semanas_est = len(meses_estacion) * SEMANAS_POR_MES
+            demanda_semanal_est = D_est / semanas_est if semanas_est > 0 else 0
+            # Lead time en meses
+            L_meses = L / SEMANAS_POR_MES
+            # Stock de seguridad
+            sigma_L = sigma_mensual * np.sqrt(L_meses)
+            SS = Z_ALPHA * sigma_L
+            # ROP
+            ROP = demanda_semanal_est * L + SS
+            # Tiempo entre pedidos
+            tiempo_entre_pedidos = semanas_est / N if N > 0 else np.nan
+            # Costo total: el costo de mantener el SS debe ser anual (H), no fraccionado
+            CTE = (D_est / Q) * COSTO_ORDENAR + (Q / 2) * H * fraccion + SS * H + 0  # +0 para mantener formato
+            resultados = resultados_pico if estacion == 'PICO' else resultados_normal
+            resultados.append({
+                'Componente': row['Componente'],
+                'Estacion': nombre_estacion,
+                'Demanda_Estacion': D_est,
+                'EOQ': Q,
+                'Num_Pedidos': N,
+                'Tiempo_Entre_Pedidos_Semanas': tiempo_entre_pedidos,
+                'Tiempo_Entre_Pedidos_Dias': tiempo_entre_pedidos * 7 if not np.isnan(tiempo_entre_pedidos) else np.nan,
+                'ROP': ROP,
+                'CTE': CTE,
+                'Costo_Unitario': C,
+                'Stock_Seguridad': SS
+            })
+    else:
+        # --- ESTACIÓN PICO ---
+        D_pico = calcular_demanda_componente_estacion(row, demanda_pico_clasicos, demanda_pico_vintage)
+        Q_pico = calcular_eoq(D_pico, COSTO_ORDENAR, H)
+        N_pico = D_pico / Q_pico if Q_pico > 0 else 0
+        CTE_pico = calcular_costo_total(D_pico, Q_pico, COSTO_ORDENAR, H * FRACCION_PICO)
+        semanas_pico = MESES_EN_PICO * SEMANAS_POR_MES
+        demanda_semanal_pico = D_pico / semanas_pico if semanas_pico > 0 else 0
+        ROP_pico = demanda_semanal_pico * L
+        tiempo_entre_pedidos_pico = semanas_pico / N_pico if N_pico > 0 else np.nan
+        resultados_pico.append({
+            'Componente': row['Componente'],
+            'Estacion': 'PICO',
+            'Demanda_Estacion': D_pico,
+            'EOQ': Q_pico,
+            'Num_Pedidos': N_pico,
+            'Tiempo_Entre_Pedidos_Semanas': tiempo_entre_pedidos_pico,
+            'Tiempo_Entre_Pedidos_Dias': tiempo_entre_pedidos_pico * 7 if not np.isnan(tiempo_entre_pedidos_pico) else np.nan,
+            'ROP': ROP_pico,
+            'CTE': CTE_pico,
+            'Costo_Unitario': C
+        })
+        # --- ESTACIÓN NORMAL ---
+        D_normal = calcular_demanda_componente_estacion(row, demanda_normal_clasicos, demanda_normal_vintage)
+        Q_normal = calcular_eoq(D_normal, COSTO_ORDENAR, H)
+        N_normal = D_normal / Q_normal if Q_normal > 0 else 0
+        CTE_normal = calcular_costo_total(D_normal, Q_normal, COSTO_ORDENAR, H * FRACCION_NORMAL)
+        semanas_normal = MESES_EN_NORMAL * SEMANAS_POR_MES
+        demanda_semanal_normal = D_normal / semanas_normal if semanas_normal > 0 else 0
+        ROP_normal = demanda_semanal_normal * L
+        tiempo_entre_pedidos_normal = semanas_normal / N_normal if N_normal > 0 else np.nan
+        resultados_normal.append({
+            'Componente': row['Componente'],
+            'Estacion': 'NORMAL',
+            'Demanda_Estacion': D_normal,
+            'EOQ': Q_normal,
+            'Num_Pedidos': N_normal,
+            'Tiempo_Entre_Pedidos_Semanas': tiempo_entre_pedidos_normal,
+            'Tiempo_Entre_Pedidos_Dias': tiempo_entre_pedidos_normal * 7 if not np.isnan(tiempo_entre_pedidos_normal) else np.nan,
+            'ROP': ROP_normal,
+            'CTE': CTE_normal,
+            'Costo_Unitario': C
+        })
 
 
 # === NUEVA SECCIÓN: CÁLCULO DE COSTO TOTAL ÓPTIMO POR COSTOS (FÓRMULA COMPLETA) ===
@@ -264,158 +312,39 @@ for res in resultados_normal:
     # h para estación normal: c * tasa_mant * fracción_normal
     h_normal = res['Costo_Unitario'] * TASA_MANTENIMIENTO * FRACCION_NORMAL
     res['CT_Optimo'] = calcular_ct_optimo(COSTO_ORDENAR, res['Demanda_Estacion'], res['EOQ'], h_normal, res['Costo_Unitario'])
-"""
-EJEMPLO DE CÁLCULO PASO A PASO PARA MOTOR DE ALTO RENDIMIENTO V8, ESTACIÓN PICO:
 
-Datos:
-K = 300
-D = 172
-Q = 7.6 (aprox, calculado por EOQ)
-c = 9000
-Tasa de mantenimiento = 0.20
-Fracción estación pico = 2/12 = 0.1667
-h = 9000 * 0.20 * 0.1667 = 300
-
-CT(Q) = (K*D)/Q + (h*Q)/2 + c*D
-    = (300*172)/7.6 + (300*7.6)/2 + 9000*172
-    = 6,789.47 + 1,140 + 1,548,000 = 1,555,929.47
-"""
-
+# Exportar resultados únicos por modo
 df_pico = pd.DataFrame(resultados_pico)
 df_normal = pd.DataFrame(resultados_normal)
+df_pico.to_csv(os.path.join(output_dir, f'eoq_estacional_pico_{modo}.csv'), index=False)
+df_normal.to_csv(os.path.join(output_dir, f'eoq_estacional_normal_{modo}.csv'), index=False)
 
-print("\n--- ESTACIÓN PICO (Oct-Nov, 2 meses) ---")
-print(f"{'Componente':<35} {'EOQ':<10} {'CT_Óptimo($)':<15}")
-print("-" * 60)
-for idx, row in df_pico.iterrows():
-    print(f"{row['Componente']:<35} {row['EOQ']:>10.1f} {row['CT_Optimo']:>15,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+# Exportar resumen por modo
+df_resumen = df_pico[['Componente','CTE','CT_Optimo']].copy()
+df_resumen = df_resumen.rename(columns={'CTE':'CTE_PICO','CT_Optimo':'CT_Optimo_PICO'})
+df_resumen = df_resumen.merge(
+    df_normal[['Componente','CTE','CT_Optimo']].rename(columns={'CTE':'CTE_NORMAL','CT_Optimo':'CT_Optimo_NORMAL'}),
+    on='Componente', how='outer')
+df_resumen['CTE_TOTAL'] = df_resumen['CTE_PICO'].fillna(0) + df_resumen['CTE_NORMAL'].fillna(0)
+df_resumen['CT_Optimo_TOTAL'] = df_resumen['CT_Optimo_PICO'].fillna(0) + df_resumen['CT_Optimo_NORMAL'].fillna(0)
+total_row = {col: '' for col in df_resumen.columns}
+for col in ['CTE_PICO','CT_Optimo_PICO','CTE_NORMAL','CT_Optimo_NORMAL','CTE_TOTAL','CT_Optimo_TOTAL']:
+    total_row[col] = df_resumen[col].sum()
+total_row['Componente'] = 'TOTAL'
+df_resumen = pd.concat([df_resumen, pd.DataFrame([total_row])], ignore_index=True)
+for col in ['CTE_PICO','CT_Optimo_PICO','CTE_NORMAL','CT_Optimo_NORMAL','CTE_TOTAL','CT_Optimo_TOTAL']:
+    df_resumen[col] = pd.to_numeric(df_resumen[col], errors='coerce').round(4)
+df_resumen.to_csv(os.path.join(output_dir, f'eoq_estacional_resumen_{modo}.csv'), index=False)
 
-print("\n--- ESTACIÓN NORMAL (resto, 10 meses) ---")
-print(f"{'Componente':<35} {'EOQ':<10} {'CT_Óptimo($)':<15}")
-print("-" * 60)
-for idx, row in df_normal.iterrows():
-    print(f"{row['Componente']:<35} {row['EOQ']:>10.1f} {row['CT_Optimo']:>15,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
-# Mostrar resultados PICO
-print(f"\n--- ESTACIÓN PICO (Oct-Nov, {MESES_EN_PICO} meses) ---")
-print(f"  Demanda anualizada para cálculo EOQ (ajustada por duración)")
-
-print(f"\n{'Componente':<35} {'D estac.':<12} {'EOQ':<10} {'N ped.':<8} {'CTE ($)':<12}")
-print("-" * 70)
-for idx, row in df_pico.iterrows():
-    print(f"{row['Componente']:<35} {row['Demanda_Estacion']:>10,.1f} {row['EOQ']:>10,.1f} {row['Num_Pedidos']:>7,.1f} {row['CTE']:>12,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
+# Calcular totales para gráficos
 cte_pico_total = df_pico['CTE'].sum()
-print(f"\n{'CTE TOTAL ESTACIÓN PICO:':<55} ${cte_pico_total:>12,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
-# Mostrar resultados NORMAL
-print(f"\n--- ESTACIÓN NORMAL (resto, {MESES_EN_NORMAL} meses) ---")
-
-print(f"\n{'Componente':<35} {'D estac.':<12} {'EOQ':<10} {'N ped.':<8} {'CTE ($)':<12}")
-print("-" * 70)
-for idx, row in df_normal.iterrows():
-    print(f"{row['Componente']:<35} {row['Demanda_Estacion']:>10,.1f} {row['EOQ']:>10,.1f} {row['Num_Pedidos']:>7,.1f} {row['CTE']:>12,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
 cte_normal_total = df_normal['CTE'].sum()
-print(f"\n{'CTE TOTAL ESTACIÓN NORMAL:':<55} ${cte_normal_total:>12,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-
 cte_anual_estacional = cte_pico_total + cte_normal_total
-print(f"\n{'CTE TOTAL ANUAL (PICO + NORMAL):':<55} ${cte_anual_estacional:>12,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
-# === 8. COMPARACIÓN CON EOQ SIN ESTACIONALIDAD ===
-
-# === 9. POLÍTICA B - CON STOCK DE SEGURIDAD ===
-
-print("\n" + "="*70)
-print("EOQ ESTACIONAL - POLÍTICA B (Nivel de Servicio 95%)")
-print("="*70)
-
-# Usar los mismos componentes y estructura que EOQ A
-print("\nComponentes considerados (idénticos a EOQ A):")
-for comp in componentes['Componente']:
-    print(f"- {comp}")
-
-
-# Exportar los mismos resultados que EOQ A para la política B, con columna de aviso
-df_pico_b = df_pico.copy()
-df_normal_b = df_normal.copy()
-df_pico_b['Aviso'] = 'Sin stock de seguridad (SS) por falta de datos'
-df_normal_b['Aviso'] = 'Sin stock de seguridad (SS) por falta de datos'
-df_pico_b.to_csv(os.path.join(output_dir, 'eoq_estacional_pico_b.csv'), index=False)
-df_normal_b.to_csv(os.path.join(output_dir, 'eoq_estacional_normal_b.csv'), index=False)
-print("\n[AVISO] Se omite el cálculo de stock de seguridad (Política B) por falta de datos de error de pronóstico.\nSe exportan los mismos productos y columnas que EOQ A en eoq_estacional_pico_b.csv y eoq_estacional_normal_b.csv.")
-
-
-# === 10. RESUMEN COMPARATIVO ===
-print("\n" + "="*70)
-print("RESUMEN EOQ ESTACIONAL (CV validado por Winston)")
-print(f"  ESTACIÓN PICO (Oct-Nov, 2 meses):")
-print(f"    Política A (sin SS):  ${cte_pico_total:>12,.2f}")
-print(f"  ESTACIÓN NORMAL (resto, 10 meses):")
-print(f"    Política A (sin SS):  ${cte_normal_total:>12,.2f}")
-print(f"  TOTALES ANUALES:")
-print(f"    Política A Estacional:  ${cte_anual_estacional:>12,.2f}")
-
-# === 11. EXPORTAR RESULTADOS ===
-print("\n--- Exportando resultados ---")
-
-# Guardar resultados por estación
-
-# Redondear a 4 decimales todos los valores numéricos antes de exportar
-
-df_pico_rounded = df_pico.copy()
-df_normal_rounded = df_normal.copy()
-for col in df_pico_rounded.select_dtypes(include=['float', 'int']).columns:
-    df_pico_rounded[col] = df_pico_rounded[col].round(4)
-for col in df_normal_rounded.select_dtypes(include=['float', 'int']).columns:
-    df_normal_rounded[col] = df_normal_rounded[col].round(4)
-df_pico_rounded.to_csv(os.path.join(output_dir, 'eoq_estacional_pico_a.csv'), index=False)
-df_normal_rounded.to_csv(os.path.join(output_dir, 'eoq_estacional_normal_a.csv'), index=False)
-
-# Crear CSV resumen para política A
-df_resumen_a = df_pico_rounded[['Componente','CTE','CT_Optimo']].copy()
-df_resumen_a = df_resumen_a.rename(columns={'CTE':'CTE_PICO','CT_Optimo':'CT_Optimo_PICO'})
-df_resumen_a = df_resumen_a.merge(
-    df_normal_rounded[['Componente','CTE','CT_Optimo']].rename(columns={'CTE':'CTE_NORMAL','CT_Optimo':'CT_Optimo_NORMAL'}),
-    on='Componente', how='outer')
-df_resumen_a['CTE_TOTAL'] = df_resumen_a['CTE_PICO'].fillna(0) + df_resumen_a['CTE_NORMAL'].fillna(0)
-df_resumen_a['CT_Optimo_TOTAL'] = df_resumen_a['CT_Optimo_PICO'].fillna(0) + df_resumen_a['CT_Optimo_NORMAL'].fillna(0)
-total_row_a = {col: '' for col in df_resumen_a.columns}
-for col in ['CTE_PICO','CT_Optimo_PICO','CTE_NORMAL','CT_Optimo_NORMAL','CTE_TOTAL','CT_Optimo_TOTAL']:
-    total_row_a[col] = df_resumen_a[col].sum()
-total_row_a['Componente'] = 'TOTAL'
-df_resumen_a = pd.concat([df_resumen_a, pd.DataFrame([total_row_a])], ignore_index=True)
-# Redondear columnas numéricas a 4 decimales
-for col in ['CTE_PICO','CT_Optimo_PICO','CTE_NORMAL','CT_Optimo_NORMAL','CTE_TOTAL','CT_Optimo_TOTAL']:
-    df_resumen_a[col] = pd.to_numeric(df_resumen_a[col], errors='coerce').round(4)
-df_resumen_a.to_csv(os.path.join(output_dir, 'eoq_estacional_resumen_a.csv'), index=False)
-
-# Crear CSV resumen para política B (idéntico a A en este caso)
-df_pico_b = df_pico_rounded.copy()
-df_normal_b = df_normal_rounded.copy()
-df_pico_b['Aviso'] = 'Sin stock de seguridad (SS) por falta de datos'
-df_normal_b['Aviso'] = 'Sin stock de seguridad (SS) por falta de datos'
-df_pico_b.to_csv(os.path.join(output_dir, 'eoq_estacional_pico_b.csv'), index=False)
-df_normal_b.to_csv(os.path.join(output_dir, 'eoq_estacional_normal_b.csv'), index=False)
-df_resumen_b = df_pico_b[['Componente','CTE','CT_Optimo']].copy()
-df_resumen_b = df_resumen_b.rename(columns={'CTE':'CTE_PICO','CT_Optimo':'CT_Optimo_PICO'})
-df_resumen_b = df_resumen_b.merge(
-    df_normal_b[['Componente','CTE','CT_Optimo']].rename(columns={'CTE':'CTE_NORMAL','CT_Optimo':'CT_Optimo_NORMAL'}),
-    on='Componente', how='outer')
-df_resumen_b['CTE_TOTAL'] = df_resumen_b['CTE_PICO'].fillna(0) + df_resumen_b['CTE_NORMAL'].fillna(0)
-df_resumen_b['CT_Optimo_TOTAL'] = df_resumen_b['CT_Optimo_PICO'].fillna(0) + df_resumen_b['CT_Optimo_NORMAL'].fillna(0)
-df_resumen_b.to_csv(os.path.join(output_dir, 'eoq_estacional_resumen_b.csv'), index=False)
-total_row_b = {col: '' for col in df_resumen_b.columns}
-for col in ['CTE_PICO','CT_Optimo_PICO','CTE_NORMAL','CT_Optimo_NORMAL','CTE_TOTAL','CT_Optimo_TOTAL']:
-    total_row_b[col] = df_resumen_b[col].sum()
-total_row_b['Componente'] = 'TOTAL'
-df_resumen_b = pd.concat([df_resumen_b, pd.DataFrame([total_row_b])], ignore_index=True)
-# Redondear columnas numéricas a 4 decimales
-for col in ['CTE_PICO','CT_Optimo_PICO','CTE_NORMAL','CT_Optimo_NORMAL','CTE_TOTAL','CT_Optimo_TOTAL']:
-    df_resumen_b[col] = pd.to_numeric(df_resumen_b[col], errors='coerce').round(4)
-df_resumen_b.to_csv(os.path.join(output_dir, 'eoq_estacional_resumen_b.csv'), index=False)
-
-print(f"[OK] Exportados en {output_dir}: eoq_estacional_pico_a.csv, eoq_estacional_normal_a.csv")
+print(f"\nResultados EOQ estacional ({modo}) exportados a: {output_dir}\n")
+print(df_pico.head())
+print(df_normal.head())
+print(df_resumen.head())
 
 # === 12. VISUALIZACIÓN ===
 print("\n--- Generando gráficos ---")

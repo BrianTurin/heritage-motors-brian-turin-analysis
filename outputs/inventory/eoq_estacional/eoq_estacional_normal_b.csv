@@ -1,6 +1,0 @@
-Componente,Estacion,Demanda_Estacion,EOQ,Num_Pedidos,Tiempo_Entre_Pedidos_Semanas,Tiempo_Entre_Pedidos_Dias,ROP,CTE,Costo_Unitario,CT_Optimo,Aviso
-Carrocería Artesanal de Época,NORMAL,150.0,5.4772,27.3861,1.5811,11.0676,34.642,15062.3703,15000,2265062.3703,Sin stock de seguridad (SS) por falta de datos
-Motor de Alto Rendimiento V8,NORMAL,278.0,9.6264,28.8791,1.4994,10.4955,38.5219,15883.482,9000,2517883.482,Sin stock de seguridad (SS) por falta de datos
-Motor de Cilindros de Línea Raro,NORMAL,150.0,6.1237,24.4949,1.7677,12.374,41.5704,13472.1936,12000,1813472.1936,Sin stock de seguridad (SS) por falta de datos
-Carrocería Estándar (Fibra),NORMAL,278.0,11.3273,24.5425,1.7643,12.35,25.6813,13498.3641,6500,1820498.3641,Sin stock de seguridad (SS) por falta de datos
-Tapicería de Cuero Premium,NORMAL,428.0,17.9165,23.8886,1.8126,12.688,79.0762,13138.7468,4000,1725138.7468,Sin stock de seguridad (SS) por falta de datos

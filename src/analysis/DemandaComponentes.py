@@ -1,6 +1,5 @@
-# ============================
-# ANÁLISIS demandas DE INSUMOS POR VEHÍCULO
-# ============================
+# ANÁLISIS DE DEMANDA DE INSUMOS POR VEHÍCULO
+# -------------------------------------------
 
 import os
 import pandas as pd

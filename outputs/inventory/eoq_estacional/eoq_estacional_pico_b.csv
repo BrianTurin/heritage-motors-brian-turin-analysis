@@ -1,6 +1,0 @@
-Componente,Estacion,Demanda_Estacion,EOQ,Num_Pedidos,Tiempo_Entre_Pedidos_Semanas,Tiempo_Entre_Pedidos_Dias,ROP,CTE,Costo_Unitario,CT_Optimo,Aviso
-Carrocería Artesanal de Época,PICO,92.0,4.2895,21.4476,0.4038,2.8264,106.2356,7506.6637,15000,1387506.6637,Sin stock de seguridad (SS) por falta de datos
-Motor de Alto Rendimiento V8,PICO,172.0,7.5719,22.7156,0.3812,2.6686,119.1686,7950.4717,9000,1555950.4717,Sin stock de seguridad (SS) por falta de datos
-Motor de Cilindros de Línea Raro,PICO,92.0,4.7958,19.1833,0.4514,3.16,127.4827,6714.1641,12000,1110714.1641,Sin stock de seguridad (SS) por falta de datos
-Carrocería Estándar (Fibra),PICO,172.0,8.9098,19.3046,0.4486,3.1402,79.4457,6756.6017,6500,1124756.6017,Sin stock de seguridad (SS) por falta de datos
-Tapicería de Cuero Premium,PICO,264.0,14.0712,18.7617,0.4616,3.2311,243.8799,6566.5821,4000,1062566.5821,Sin stock de seguridad (SS) por falta de datos
