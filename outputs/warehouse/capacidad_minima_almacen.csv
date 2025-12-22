@@ -1,0 +1,18 @@
+Componente,Estacion,Inventario_Maximo,Volumen_por_Unidad_m3,Capacidad_Requerida_m3
+Carrocería Artesanal de Época,PICO,183.1896,4.0,732.7584
+Motor de Alto Rendimiento V8,PICO,232.1094,0.8,185.6875
+Motor de Cilindros de Línea Raro,PICO,211.9389,0.9,190.745
+Carrocería Estándar (Fibra),PICO,176.073,3.5,616.2555
+Tapicería de Cuero Premium,PICO,445.5395,0.5,222.7698
+Carrocería Artesanal de Época,NORMAL,61.4728,4.0,245.8912
+Motor de Alto Rendimiento V8,NORMAL,79.1653,0.8,63.3322
+Motor de Cilindros de Línea Raro,NORMAL,71.1193,0.9,64.0074
+Carrocería Estándar (Fibra),NORMAL,63.278,3.5,221.473
+Tapicería de Cuero Premium,NORMAL,152.3652,0.5,76.1826
+TOTAL,"PICO (mayor necesidad, suma de máximos por componente)",1248.8504,—,1948.2162
+
+Totales por estación,,Inventario_Maximo,Capacidad_Requerida_m3
+NORMAL,,427.4006,670.8864
+PICO,,1248.8504,1948.2162
+
+Estación con mayor necesidad:,PICO,Inventario_Maximo:,1248.8504,Capacidad_Requerida_m3:,1948.2162

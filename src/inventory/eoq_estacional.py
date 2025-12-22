@@ -212,7 +212,7 @@ for idx, row in componentes.iterrows():
         sigma_mensual = demanda_mensual.std(ddof=0)
         Q = calcular_eoq(D_anual, COSTO_ORDENAR, H)
         N = D_anual / Q if Q > 0 else 0
-        # Para cada estación, calcular demanda y SS
+        # Para cada estación, calcular demanda y SS usando sigma_mensual de la estación
         for estacion, meses_estacion, fraccion, nombre_estacion in [
             ('PICO', MESES_PICO, FRACCION_PICO, 'PICO'),
             ('NORMAL', MESES_NORMAL, FRACCION_NORMAL, 'NORMAL')]:
@@ -221,8 +221,15 @@ for idx, row in componentes.iterrows():
             demanda_semanal_est = D_est / semanas_est if semanas_est > 0 else 0
             # Lead time en meses
             L_meses = L / SEMANAS_POR_MES
-            # Stock de seguridad
-            sigma_L = sigma_mensual * np.sqrt(L_meses)
+            # Calcular sigma_mensual solo con los meses de la estación
+            demanda_mensual_est = demanda_mensual[df_pronostico['Mes'].isin(meses_estacion)]
+            if len(demanda_mensual_est) < 2:
+                print(f"[ADVERTENCIA] Solo hay {len(demanda_mensual_est)} mes(es) en la estación {nombre_estacion} para el componente {row['Componente']}. No se puede calcular sigma_mensual correctamente.")
+                sigma_mensual_est = float('nan')
+            else:
+                sigma_mensual_est = demanda_mensual_est.std(ddof=0)
+            # Stock de seguridad específico por estación
+            sigma_L = sigma_mensual_est * np.sqrt(L_meses)
             SS = Z_ALPHA * sigma_L
             # ROP
             ROP = demanda_semanal_est * L + SS
@@ -242,7 +249,8 @@ for idx, row in componentes.iterrows():
                 'ROP': ROP,
                 'CTE': CTE,
                 'Costo_Unitario': C,
-                'Stock_Seguridad': SS
+                'Stock_Seguridad': SS,
+                'sigma_mensual': sigma_mensual_est
             })
     else:
         # --- ESTACIÓN PICO ---
@@ -340,6 +348,66 @@ df_resumen.to_csv(os.path.join(output_dir, f'eoq_estacional_resumen_{modo}.csv')
 cte_pico_total = df_pico['CTE'].sum()
 cte_normal_total = df_normal['CTE'].sum()
 cte_anual_estacional = cte_pico_total + cte_normal_total
+
+
+# === 11. TABLA DE VALORES CLAVE POR COMPONENTE Y ESTACIÓN ===
+import tabulate
+print("\n" + "="*70)
+print("TABLA DE VALORES CLAVE POR COMPONENTE Y ESTACIÓN")
+print("="*70)
+
+tabla = []
+columnas = [
+    "Componente", "Estacion", "Demanda_Estacion", "EOQ", "Num_Pedidos", "Lead_Time_Semanas",
+    "ROP", "Stock_Seguridad", "sigma_mensual", "fraccion", "CTE", "CT_Optimo"
+]
+
+
+# Usar el sigma_mensual y fraccion almacenados en cada resultado por estación
+for df in [df_pico, df_normal]:
+    for idx, row in df.iterrows():
+        comp = row['Componente']
+        lead_time = componentes[componentes['Componente'] == comp]['Lead_Time_Semanas'].values[0]
+        ss = row['Stock_Seguridad'] if 'Stock_Seguridad' in row else 0
+        fraccion = row['fraccion'] if 'fraccion' in row else (FRACCION_PICO if row['Estacion'] == 'PICO' else FRACCION_NORMAL)
+        sigma_mensual = row['sigma_mensual'] if 'sigma_mensual' in row else np.nan
+        tabla.append([
+            comp,
+            row['Estacion'],
+            row['Demanda_Estacion'],
+            row['EOQ'],
+            row['Num_Pedidos'],
+            lead_time,
+            row['ROP'],
+            ss,
+            sigma_mensual,
+            fraccion,
+            row['CTE'],
+            row['CT_Optimo']
+        ])
+
+try:
+    from tabulate import tabulate as tabulate_func
+except ImportError:
+    def tabulate_func(data, headers, floatfmt):
+        # Fallback simple si no está tabulate
+        header_line = " | ".join(headers)
+        lines = [header_line, "-"*len(header_line)]
+        for row in data:
+            lines.append(" | ".join([f"{x:.2f}" if isinstance(x, float) else str(x) for x in row]))
+        return "\n".join(lines)
+
+
+# Exportar la tabla de valores clave a un CSV
+tabla_df = pd.DataFrame(tabla, columns=columnas)
+# Redondear todas las columnas numéricas a 4 decimales
+for col in tabla_df.columns:
+    if pd.api.types.is_numeric_dtype(tabla_df[col]):
+        tabla_df[col] = tabla_df[col].round(4)
+tabla_csv_path = os.path.join(output_dir, 'tabla_valores_clave.csv')
+tabla_df.to_csv(tabla_csv_path, index=False)
+print(f"\n[OK] Tabla de valores clave exportada a: {tabla_csv_path}\n")
+print(tabulate_func(tabla, columnas, floatfmt=".4f"))
 
 print(f"\nResultados EOQ estacional ({modo}) exportados a: {output_dir}\n")
 print(df_pico.head())
