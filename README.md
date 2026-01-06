@@ -1,8 +1,6 @@
 # 🚗 Proyecto de Investigación Operativa
 ## Análisis de Ventas y Gestión de Inventario - Vehículos Clásicos y Vintage
 
-![Cars](https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif)
-
 *Trabajo Práctico Final - Ingeniería en Sistemas de Información*
 
 ---
@@ -401,28 +399,7 @@ Este proyecto fue desarrollado como Trabajo Práctico Final para **Investigació
 - **Carrera**: Ingeniería en Sistemas de Información
 - **Año**: 2025
 
----
-
-<div align="center">
-
-## 🎓 ¡Gracias por visitar nuestro proyecto!
-
-*"Al finalizar todo este trabajo..."*
-
-| 🧠 Lo que aprendimos | 🧉 Mate consumido | 🐛 Bugs encontrados |
-|:---:|:---:|:---:|
-| Mucho | Demasiado | No queremos hablar de eso |
-
-![ThankYou](https://media.giphy.com/media/3oz8xIsloV7zOmt81G/giphy.gif)
-
-**¿Te gustó el proyecto? ¡Dale una ⭐ al repositorio!**
-
-[![Made with Love](https://img.shields.io/badge/Made%20with-❤️%20y%20mate-red?style=for-the-badge)]()
-
----
 
 *UTN FRCU - Ingeniería en Sistemas - 2025*
-
-*"La optimización es el arte de hacer lo mejor posible con lo que se tiene... incluyendo las horas de sueño"* 😴
 
 </div>
