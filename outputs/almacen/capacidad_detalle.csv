@@ -1,0 +1,23 @@
+Componente,Politica,q,Stock_Seguridad,Inventario_Maximo,Volumen_Unitario_m3,Capacidad_Requerida_m3
+Motor de Alto Rendimiento V8,A - Pedidos pendientes,13.7195,8.6707,22.3902,0.8,17.9122
+Motor de Cilindros en Línea Raro,A - Pedidos pendientes,9.3901,7.97,17.3601,0.9,15.6241
+Carrocería Artesanal de Época,A - Pedidos pendientes,8.3988,7.09,15.4888,4.0,61.9552
+Carrocería Estándar (Fibra),A - Pedidos pendientes,16.1437,7.3554,23.4991,3.5,82.2468
+Transmisión de 5 Velocidades,A - Pedidos pendientes,28.0413,13.9921,42.0334,0.4,16.8134
+Sistema de Inyección Electrónica,A - Pedidos pendientes,37.5723,7.516,45.0883,0.1,4.5088
+Set de Carburadores Dobles,A - Pedidos pendientes,34.2879,6.5181,40.806,0.1,4.0806
+Tapicería de Cuero Premium,A - Pedidos pendientes,26.2303,19.5594,45.7897,0.5,22.8948
+Juego de Llantas Vintage Espec.,A - Pedidos pendientes,41.1454,26.7736,67.919,0.15,10.1878
+Llantas Regulares Cromados,A - Pedidos pendientes,130.1543,29.3575,159.5118,0.1,15.9512
+Cubiertas de Alta Gama (Neumáticos),A - Pedidos pendientes,209.8421,51.8034,261.6455,0.1,26.1645
+Motor de Alto Rendimiento V8,B - Nivel de servicio 95%,13.7195,7.7369,21.4564,0.8,17.1651
+Motor de Cilindros en Línea Raro,B - Nivel de servicio 95%,9.3901,6.8342,16.2243,0.9,14.6019
+Carrocería Artesanal de Época,B - Nivel de servicio 95%,8.3988,6.2388,14.6376,4.0,58.5504
+Carrocería Estándar (Fibra),B - Nivel de servicio 95%,16.1437,6.3172,22.4609,3.5,78.6131
+Transmisión de 5 Velocidades,B - Nivel de servicio 95%,28.0413,10.2629,38.3042,0.4,15.3217
+Sistema de Inyección Electrónica,B - Nivel de servicio 95%,37.5723,5.4708,43.0431,0.1,4.3043
+Set de Carburadores Dobles,B - Nivel de servicio 95%,34.2879,4.4115,38.6994,0.1,3.8699
+Tapicería de Cuero Premium,B - Nivel de servicio 95%,26.2303,14.514,40.7443,0.5,20.3721
+Juego de Llantas Vintage Espec.,B - Nivel de servicio 95%,41.1454,17.6458,58.7912,0.15,8.8187
+Llantas Regulares Cromados,B - Nivel de servicio 95%,130.1543,17.8677,148.022,0.1,14.8022
+Cubiertas de Alta Gama (Neumáticos),B - Nivel de servicio 95%,209.8421,29.0279,238.87,0.1,23.887

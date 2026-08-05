@@ -1,0 +1,12 @@
+Componente,Auto_Foco,Clase_ABC,Demanda_Anual,Costo_Unitario,h_Anual,c_B_Deficit,Lead_Time_Semanas,E_X,sigma_X,Volumen_m3
+Motor de Alto Rendimiento V8,Clásico,A,564.6715,9000,1800.0,1340.0,6,65.1546,4.7037,0.8
+Motor de Cilindros en Línea Raro,Vintage,A,352.697,12000,2400.0,2320.0,12,81.3912,4.1549,0.9
+Carrocería Artesanal de Época,Vintage,A,352.697,15000,3000.0,2320.0,10,67.826,3.7929,4.0
+Carrocería Estándar (Fibra),Clásico,A,564.6715,6500,1300.0,1340.0,4,43.4364,3.8406,3.5
+Transmisión de 5 Velocidades,Ambos,B,917.3686,3500,700.0,1716.7767,4,70.5668,6.2394,0.4
+Sistema de Inyección Electrónica,Clásico,C,564.6715,1200,240.0,1340.0,3,32.5773,3.326,0.1
+Set de Carburadores Dobles,Vintage,C,352.697,900,180.0,2320.0,5,33.913,2.682,0.1
+Tapicería de Cuero Premium,Ambos,A,917.3686,4000,800.0,1716.7767,8,141.1336,8.8239,0.5
+Juego de Llantas Vintage Espec.,Vintage,B,1410.7882,2500,500.0,2320.0,5,135.6525,10.7279,0.15
+Llantas Regulares Cromados,Clásico,C,2258.6862,400,80.0,1340.0,2,86.8726,10.8628,0.1
+Cubiertas de Alta Gama (Neumáticos),Ambos,B,3669.4743,250,50.0,1716.7767,2,141.1336,17.6477,0.1

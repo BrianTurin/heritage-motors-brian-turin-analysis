@@ -1,0 +1,4 @@
+Escenario,q_Promedio,Stock_Seguridad_Total,Deficit_Anual_Total,TC_Total,P_Agotamiento_Media,SLM1_Media,Variacion_TC_Pct
+c_B -30%,14.7765,46.7145,13.3611,205724.1582,0.0377,0.9944,-2.755
+c_B base,14.7765,50.6454,8.8933,211552.5256,0.0264,0.9963,0.0
+c_B +30%,14.7765,53.396,6.6112,215663.0737,0.0203,0.9972,1.943

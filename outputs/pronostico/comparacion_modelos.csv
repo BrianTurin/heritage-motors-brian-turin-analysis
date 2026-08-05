@@ -1,0 +1,4 @@
+Modelo,Nombre,MAE,RMSE,MAPE,Desvio_Residuos,Total_Pronosticado
+prophet,Prophet,4.4145,6.3812,14.6964,6.4942,917.3686
+holt_winters,Holt-Winters aditivo,9.1188,11.0923,27.6269,11.2887,906.2587
+sarima,SARIMA,23.0917,34.8551,53.894,35.4709,818.7401
