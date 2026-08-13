@@ -59,6 +59,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.patches import Patch
 
 from src import parametros, rutas
 
@@ -94,15 +95,24 @@ def capacidad_por_politica(tabla, etiqueta):
 
 
 def dimensionar(volumen_neto):
-    """Convierte volumen neto en superficie y costo, para cada escenario."""
+    """Convierte volumen neto en superficie y costo, para cada escenario.
+
+    Cada paso redondea antes de alimentar al siguiente, para que la cadena
+    volumen -> superficie -> costo se pueda rehacer a mano con las mismas cifras
+    que muestra el informe. Con los valores exactos el costo sale de 107,3011 m2
+    x 1.500 = 160.952, y un lector que multiplica los 107 m2 de la tabla obtiene
+    160.500: la tabla dejaba de cerrar consigo misma. Nadie construye 107,3 m2,
+    asi que se redondea y se valoriza sobre el redondeo.
+    """
+    neto = round(volumen_neto, 1)
     filas = []
     for nombre, utilizacion in ESCENARIOS.items():
-        volumen_total = volumen_neto / utilizacion
-        superficie = volumen_total / ALTURA_UTIL_M
+        volumen_total = round(neto / utilizacion)
+        superficie = round(volumen_total / ALTURA_UTIL_M)
         filas.append({
             "Escenario": nombre,
             "Utilizacion": utilizacion,
-            "Volumen_Neto_m3": volumen_neto,
+            "Volumen_Neto_m3": neto,
             "Volumen_Almacen_m3": volumen_total,
             "Superficie_m2": superficie,
             "Costo_Construccion_USD": superficie * COSTO_M2,
@@ -110,40 +120,66 @@ def dimensionar(volumen_neto):
     return pd.DataFrame(filas)
 
 
+# Nombre corto de cada politica para los ejes. Los nombres completos ocupan mas
+# de veinte caracteres y, puestos uno al lado del otro, se superponen hasta
+# volverse ilegibles.
+POLITICA_CORTA = {
+    "A - Pedidos pendientes": "A",
+    "B - Nivel de servicio 95%": "B",
+}
+
+
 def graficar(detalle, ruta):
     fig, (izq, der) = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Volumen requerido por componente, comparando politicas
+    # Volumen requerido por componente, comparando politicas. Se ordena de mayor
+    # a menor: la pregunta que contesta el panel es que componentes se comen el
+    # almacen, y ordenado alfabeticamente esa respuesta hay que buscarla.
     pivote = detalle.pivot(index="Componente", columns="Politica",
                            values="Capacidad_Requerida_m3")
+    pivote = pivote.loc[pivote.max(axis=1).sort_values().index]
     pivote.index = parametros.abreviar(pivote.index)
     pivote.plot(kind="barh", ax=izq, color=["#4c72b0", "#dd8452"])
-    izq.set_xlabel("Volumen requerido (m3)")
+    izq.set_xlabel("Volumen requerido (m³)")
     izq.set_ylabel("")
     izq.set_title("Espacio por componente")
     izq.grid(axis="x", alpha=0.3)
+    izq.legend(title="Politica")
 
-    # Total por politica y los dos escenarios de galpon
+    # Total por politica: el volumen neto de las piezas y lo que hay que
+    # construir con cada nivel de aprovechamiento del galpon.
     totales = detalle.groupby("Politica")["Capacidad_Requerida_m3"].sum()
     etiquetas, valores, colores = [], [], []
     for politica, neto in totales.items():
-        etiquetas.append(f"{politica}\nneto")
+        corta = POLITICA_CORTA.get(politica, politica)
+        es_a = corta == "A"
+        etiquetas.append(f"{corta}\nneto")
         valores.append(neto)
-        colores.append("#4c72b0" if "A" in politica else "#dd8452")
+        colores.append("#4c72b0" if es_a else "#dd8452")
         for nombre, utilizacion in ESCENARIOS.items():
-            etiquetas.append(f"{politica}\n{nombre}")
+            etiquetas.append(f"{corta}\n{nombre}")
             valores.append(neto / utilizacion)
-            colores.append("#a3bcd8" if "A" in politica else "#f0c3a0")
+            colores.append("#a3bcd8" if es_a else "#f0c3a0")
 
     barras = der.bar(etiquetas, valores, color=colores)
-    der.set_ylabel("Volumen de almacen (m3)")
+    der.set_ylabel("Volumen de almacen (m³)")
     der.set_title("Capacidad requerida segun politica y aprovechamiento")
     der.grid(axis="y", alpha=0.3)
+    # Aire arriba para que la leyenda no tape ni las barras ni sus numeros.
+    der.set_ylim(0, max(valores) * 1.3)
     for barra, valor in zip(barras, valores):
         der.text(barra.get_x() + barra.get_width() / 2, valor,
                  f"{valor:,.0f}".replace(",", "."), ha="center", va="bottom",
                  fontsize=8)
 
+    # El tono claro y el oscuro distinguen el volumen neto de lo que hay que
+    # construir, y eso solo estaba dicho en las etiquetas del eje.
+    der.legend(handles=[
+        Patch(facecolor="#7f7f7f", label="Volumen neto de las piezas"),
+        Patch(facecolor="#cccccc", label="Galpon a construir (segun aprovechamiento)"),
+    ], loc="upper left", fontsize=8)
+
+    fig.suptitle("Dimensionamiento del almacen central", fontsize=13)
     fig.tight_layout()
     rutas.guardar_figura(fig, ruta)
     plt.close(fig)
@@ -152,15 +188,17 @@ def graficar(detalle, ruta):
 def main():
     rutas.titulo("ETAPA 5 - CAPACIDAD MINIMA DE ALMACEN")
 
-    ruta_a = rutas.exigir(rutas.INVENTARIO / "politica_a.csv", "politicas")
-    ruta_b = rutas.exigir(rutas.INVENTARIO / "politica_b.csv", "politicas")
-    politica_a = pd.read_csv(ruta_a)
-    politica_b = pd.read_csv(ruta_b)
+    ruta = rutas.exigir(rutas.INVENTARIO / "politicas.csv", "politicas")
+    politicas = pd.read_csv(ruta)
 
-    detalle = pd.concat([
-        capacidad_por_politica(politica_a, "A - Pedidos pendientes"),
-        capacidad_por_politica(politica_b, "B - Nivel de servicio 95%"),
-    ], ignore_index=True)
+    # Las dos politicas vienen en la misma tabla, distinguidas por la columna
+    # Politica. Se procesa cada una por separado porque el inventario maximo, y
+    # por lo tanto el lugar que hace falta en el almacen, es distinto en cada una.
+    detalle = pd.concat(
+        [capacidad_por_politica(grupo, nombre)
+         for nombre, grupo in politicas.groupby("Politica", sort=True)],
+        ignore_index=True,
+    )
 
     print("Inventario maximo q + (r - E(X)) y volumen requerido:\n")
     print(detalle.to_string(index=False,

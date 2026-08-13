@@ -1,2 +1,2 @@
-Modelo,Nombre,MAPE,Demanda_Anual_Total,Sigma_Error_Mensual,Sigma_Error_Semanal,Proporcion_Clasicos,Proporcion_Vintage
-prophet,Prophet,14.696352555469836,917.3685871639517,6.49417961268015,3.119702975571325,0.6155339805825243,0.3844660194174757
+Modelo,Nombre,MAPE_Validacion,Demanda_Anual_Total,Sigma_Error_Mensual,Sigma_Error_Semanal,RMSE_Validacion,Proporcion_Clasicos,Proporcion_Vintage
+HoltWinters,Holt-Winters aditivo,31.8745,906.2587,11.2887,5.4229,15.6277,0.6155,0.3845

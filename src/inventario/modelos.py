@@ -146,6 +146,26 @@ def indicadores(E_D, K, h, c_B, q, z, sigma_X, E_X):
     }
 
 
+def promedio_ponderado(valores, pesos, decimales=4):
+    """Promedio ponderado por demanda, redondeando los valores primero.
+
+    El nivel de servicio de una politica es el de la demanda que atiende, no el
+    promedio simple de sus componentes: un insumo que se pide 35 veces al anio
+    no pesa lo mismo que uno que se pide una vez.
+
+    El redondeo previo no es cosmetico. El informe publica P(X >= r) y SLM1 con
+    cuatro decimales por componente, y quien rehaga el promedio con esa tabla a
+    la vista tiene que llegar al numero publicado. Con los valores exactos da
+    0,0245 y con los de la tabla 0,0244; se reporta el segundo.
+    """
+    valores = [round(float(v), decimales) for v in valores]
+    pesos = [float(p) for p in pesos]
+    total = sum(pesos)
+    if total == 0:
+        return float("nan")
+    return sum(v * p for v, p in zip(valores, pesos)) / total
+
+
 # --- Politica A: pedidos pendientes (Winston 16.6, ecuacion 13) ---------------
 
 def politica_pedidos_pendientes(E_D, K, h, c_B, E_X, sigma_X):

@@ -26,6 +26,20 @@ Tampoco se mueve q, porque el EOQ tampoco depende de sigma_X. Toda la
 incertidumbre extra se paga con stock inmovilizado, sin margen de maniobra: esa
 es la demostracion concreta de que la volatilidad se traduce en capital parado.
 
+Vale aclarar de donde sale esa rigidez, porque es de la aproximacion q* = EOQ de
+la ecuacion (13) y no del modelo (q, r) en general. En el sistema exacto de la
+ecuacion (12) el lote lleva sumado el deficit del ciclo,
+
+    q = (2*E(D)*(K + c_B*E(B_r)) / h)^(1/2)
+
+y ahi sigma_X si entra, a traves de E(B_r). Resuelto asi, el modelo amortigua un
+poco: pide lotes 3 a 5% mas grandes, y como menos ciclos al anio son menos
+oportunidades de agotarse, el stock de seguridad sube 13,5 a 14,3% en vez del 15%
+exacto. El margen de maniobra existe, pero es marginal, asi que la conclusion de
+fondo se sostiene: la volatilidad se paga casi entera con capital parado. La
+verificacion de la etapa 4b (verificacion_eoq.csv) va en la misma linea, con q
+del exacto 17 a 37% por encima del EOQ pero TC a menos del 2% de diferencia.
+
 Donde si se diferencian es en cuanto les cuesta. La Politica A parte de un stock
 de seguridad mas alto, asi que el deficit adicional que genera la mayor
 volatilidad es menor y su costo sube menos.
@@ -41,11 +55,29 @@ from src.inventario import modelos
 
 AUMENTO_SIGMA = 0.15
 
+ESCENARIO_BASE = "Base"
+ESCENARIO_ENUNCIADO = f"+{AUMENTO_SIGMA:.0%}"
+ESCENARIO_VALIDACION = "sigma de validacion"
 
-def evaluar(parametros_riesgo):
-    """Resuelve ambas politicas con sigma base y con sigma aumentado."""
+
+def factor_validacion():
+    """Cuanto mas grande es el error fuera de muestra que el del ajuste.
+
+    El stock de seguridad se dimensiona con el desvio de los residuos del
+    ajuste, que subestima el error real porque el modelo ya vio esos meses. El
+    RMSE de la validacion de origen movil si es fuera de muestra y da bastante
+    mas alto. Este escenario mide cuanto cambiaria todo si se usara ese, que es
+    la unica incertidumbre del modelo que no cubre el +15% del enunciado.
+    """
+    ruta = rutas.exigir(rutas.PRONOSTICO / "resumen_pronostico.csv", "pronostico")
+    resumen = pd.read_csv(ruta).iloc[0]
+    return float(resumen["RMSE_Validacion"] / resumen["Sigma_Error_Mensual"])
+
+
+def evaluar(parametros_riesgo, escenarios):
+    """Resuelve ambas politicas en cada escenario de incertidumbre."""
     filas = []
-    for factor, nombre in ((1.0, "Base"), (1 + AUMENTO_SIGMA, f"+{AUMENTO_SIGMA:.0%}")):
+    for nombre, factor in escenarios.items():
         for _, fila in parametros_riesgo.iterrows():
             argumentos = dict(
                 E_D=fila["Demanda_Anual"],
@@ -79,7 +111,11 @@ def evaluar(parametros_riesgo):
 
 
 def resumir(detalle):
-    """Compara base contra escenario de mayor incertidumbre, por politica."""
+    """Totales por politica y escenario, con la variacion contra el base.
+
+    Va en formato largo, con una columna Escenario, en vez de una columna por
+    escenario: asi agregar un escenario mas no cambia la forma de la tabla.
+    """
     agregado = detalle.groupby(["Politica", "Escenario"], sort=False).agg(
         Stock_Seguridad=("Stock_Seguridad", "sum"),
         Costo_Almacenamiento=("Costo_Almacenamiento", "sum"),
@@ -87,60 +123,73 @@ def resumir(detalle):
         TC=("TC", "sum"),
     ).reset_index()
 
-    filas = []
-    for politica in ("A", "B"):
-        sub = agregado[agregado["Politica"] == politica].set_index("Escenario")
-        base = sub.loc["Base"]
-        alto = sub.loc[f"+{AUMENTO_SIGMA:.0%}"]
-        filas.append({
-            "Politica": politica,
-            "SS_Base": base["Stock_Seguridad"],
-            "SS_Alto": alto["Stock_Seguridad"],
-            "SS_Var_Pct": 100 * (alto["Stock_Seguridad"] / base["Stock_Seguridad"] - 1),
-            "TC_Base": base["TC"],
-            "TC_Alto": alto["TC"],
-            "TC_Var_Pct": 100 * (alto["TC"] / base["TC"] - 1),
-            "Delta_TC": alto["TC"] - base["TC"],
-        })
-    return pd.DataFrame(filas)
+    base = (agregado[agregado["Escenario"] == ESCENARIO_BASE]
+            .set_index("Politica"))
+
+    agregado["SS_Var_Pct"] = [
+        100 * (fila.Stock_Seguridad / base.loc[fila.Politica, "Stock_Seguridad"] - 1)
+        for fila in agregado.itertuples()
+    ]
+    agregado["TC_Var_Pct"] = [
+        100 * (fila.TC / base.loc[fila.Politica, "TC"] - 1)
+        for fila in agregado.itertuples()
+    ]
+    agregado["Delta_TC"] = [
+        fila.TC - base.loc[fila.Politica, "TC"] for fila in agregado.itertuples()
+    ]
+    return agregado
 
 
 def graficar(detalle, resumen, ruta):
     fig, ejes = plt.subplots(1, 3, figsize=(16, 5))
 
+    # Los dos primeros paneles contrastan el base con el escenario que pide el
+    # enunciado. El de sigma de validacion queda en la tabla: con tres barras
+    # por politica el panel deja de leerse de un vistazo, y ademas responde otra
+    # pregunta (que tan bien estimamos el error, no que tan volatil es el mercado).
+    ss = resumen.pivot(index="Politica", columns="Escenario",
+                       values="Stock_Seguridad")
+    tc = resumen.pivot(index="Politica", columns="Escenario", values="TC")
+    variacion = resumen.set_index(["Politica", "Escenario"])
+    politicas = list(ss.index)
+    posiciones = range(len(politicas))
+    ancho = 0.35
+
     # Stock de seguridad total: base vs +15%
     izq = ejes[0]
-    posiciones = range(len(resumen))
-    ancho = 0.35
-    izq.bar([p - ancho / 2 for p in posiciones], resumen["SS_Base"], ancho,
+    izq.bar([p - ancho / 2 for p in posiciones], ss[ESCENARIO_BASE], ancho,
             label="Base", color="#4c72b0")
-    izq.bar([p + ancho / 2 for p in posiciones], resumen["SS_Alto"], ancho,
+    izq.bar([p + ancho / 2 for p in posiciones], ss[ESCENARIO_ENUNCIADO], ancho,
             label=f"+{AUMENTO_SIGMA:.0%} sigma_X", color="#c44e52")
     izq.set_xticks(list(posiciones))
-    izq.set_xticklabels([f"Politica {p}" for p in resumen["Politica"]])
+    izq.set_xticklabels([f"Politica {p}" for p in politicas])
     izq.set_ylabel("Stock de seguridad total (unidades)")
     izq.set_title("La incertidumbre obliga a mas stock de seguridad")
-    izq.legend()
     izq.grid(axis="y", alpha=0.3)
-    for posicion, fila in zip(posiciones, resumen.itertuples()):
-        izq.text(posicion + ancho / 2, fila.SS_Alto, f"{fila.SS_Var_Pct:+.1f}%",
-                 ha="center", va="bottom", fontsize=9)
+    # Aire arriba: sin esto la etiqueta de variacion de la barra mas alta queda
+    # tapada por la leyenda.
+    izq.set_ylim(0, ss[ESCENARIO_ENUNCIADO].max() * 1.2)
+    for posicion, politica in zip(posiciones, politicas):
+        pct = variacion.loc[(politica, ESCENARIO_ENUNCIADO), "SS_Var_Pct"]
+        izq.text(posicion + ancho / 2, ss.loc[politica, ESCENARIO_ENUNCIADO],
+                 f"{pct:+.1f}%", ha="center", va="bottom", fontsize=9)
 
     # TC(q, r) total: base vs +15%
     medio = ejes[1]
-    medio.bar([p - ancho / 2 for p in posiciones], resumen["TC_Base"] / 1e3, ancho,
+    medio.bar([p - ancho / 2 for p in posiciones], tc[ESCENARIO_BASE] / 1e3, ancho,
               label="Base", color="#4c72b0")
-    medio.bar([p + ancho / 2 for p in posiciones], resumen["TC_Alto"] / 1e3, ancho,
-              label=f"+{AUMENTO_SIGMA:.0%} sigma_X", color="#c44e52")
+    medio.bar([p + ancho / 2 for p in posiciones], tc[ESCENARIO_ENUNCIADO] / 1e3,
+              ancho, label=f"+{AUMENTO_SIGMA:.0%} sigma_X", color="#c44e52")
     medio.set_xticks(list(posiciones))
-    medio.set_xticklabels([f"Politica {p}" for p in resumen["Politica"]])
+    medio.set_xticklabels([f"Politica {p}" for p in politicas])
     medio.set_ylabel("TC(q, r) total anual (miles USD)")
     medio.set_title("Impacto en el costo total")
-    medio.legend()
     medio.grid(axis="y", alpha=0.3)
-    for posicion, fila in zip(posiciones, resumen.itertuples()):
-        medio.text(posicion + ancho / 2, fila.TC_Alto / 1e3,
-                   f"{fila.TC_Var_Pct:+.1f}%", ha="center", va="bottom", fontsize=9)
+    medio.set_ylim(0, tc[ESCENARIO_ENUNCIADO].max() / 1e3 * 1.2)
+    for posicion, politica in zip(posiciones, politicas):
+        pct = variacion.loc[(politica, ESCENARIO_ENUNCIADO), "TC_Var_Pct"]
+        medio.text(posicion + ancho / 2, tc.loc[politica, ESCENARIO_ENUNCIADO] / 1e3,
+                   f"{pct:+.1f}%", ha="center", va="bottom", fontsize=9)
 
     # Stock de seguridad por componente
     der = ejes[2]
@@ -149,11 +198,18 @@ def graficar(detalle, resumen, ruta):
     )
     pivote.index = parametros.abreviar(pivote.index)
     pivote.plot(kind="barh", ax=der, color=["#4c72b0", "#dd8452"])
-    der.set_xlabel("Stock de seguridad con +15% sigma_X (unidades)")
+    der.set_xlabel(f"Stock de seguridad con +{AUMENTO_SIGMA:.0%} sigma_X (unidades)")
     der.set_ylabel("")
-    der.set_title("Detalle por componente")
+    der.set_title(f"Stock de seguridad por componente con +{AUMENTO_SIGMA:.0%}")
     der.grid(axis="x", alpha=0.3)
+    der.legend(title="Politica")
 
+    # Los paneles 1 y 2 usan el mismo par de colores para lo mismo, asi que la
+    # referencia va una sola vez a nivel de figura en vez de repetirse en cada uno.
+    fig.legend(*izq.get_legend_handles_labels(), loc="lower center", ncol=2,
+               bbox_to_anchor=(0.35, -0.02))
+    fig.suptitle(f"Sensibilidad al riesgo: +{AUMENTO_SIGMA:.0%} de incertidumbre "
+                 f"en la demanda", fontsize=13)
     fig.tight_layout()
     rutas.guardar_figura(fig, ruta)
     plt.close(fig)
@@ -167,7 +223,16 @@ def main():
     # TC base coincida con el que se reporta alli.
     parametros_riesgo = pd.read_csv(ruta).query("Clase_ABC == 'A'").reset_index(drop=True)
 
-    detalle = evaluar(parametros_riesgo)
+    factor = factor_validacion()
+    escenarios = {
+        ESCENARIO_BASE: 1.0,
+        ESCENARIO_ENUNCIADO: 1 + AUMENTO_SIGMA,
+        ESCENARIO_VALIDACION: factor,
+    }
+    print(f"Escenario adicional: sigma de validacion, factor {factor:.4f} "
+          f"(+{100 * (factor - 1):.2f}% sobre el desvio del ajuste)\n")
+
+    detalle = evaluar(parametros_riesgo, escenarios)
     resumen = resumir(detalle)
 
     print("Detalle por componente y politica:\n")
@@ -181,18 +246,23 @@ def main():
                                         "Costo_Deficit": "{:,.0f}".format,
                                         "TC": "{:,.0f}".format}))
 
-    print("\nResumen por politica:\n")
+    print("\nResumen por politica y escenario:\n")
     print(resumen.to_string(index=False,
-                            formatters={"SS_Base": "{:,.1f}".format,
-                                        "SS_Alto": "{:,.1f}".format,
+                            formatters={"Stock_Seguridad": "{:,.1f}".format,
+                                        "Costo_Almacenamiento": "{:,.0f}".format,
+                                        "Costo_Deficit": "{:,.0f}".format,
+                                        "TC": "{:,.0f}".format,
                                         "SS_Var_Pct": "{:+.2f}".format,
-                                        "TC_Base": "{:,.0f}".format,
-                                        "TC_Alto": "{:,.0f}".format,
                                         "TC_Var_Pct": "{:+.2f}".format,
                                         "Delta_TC": "{:+,.0f}".format}))
 
-    fila_a = resumen[resumen["Politica"] == "A"].iloc[0]
-    fila_b = resumen[resumen["Politica"] == "B"].iloc[0]
+    def buscar(politica, escenario):
+        seleccion = resumen[(resumen["Politica"] == politica)
+                            & (resumen["Escenario"] == escenario)]
+        return seleccion.iloc[0]
+
+    fila_a = buscar("A", ESCENARIO_ENUNCIADO)
+    fila_b = buscar("B", ESCENARIO_ENUNCIADO)
 
     print("\nLectura:")
     print(f"  Un {AUMENTO_SIGMA:.0%} mas de incertidumbre obliga a subir el stock de")
@@ -212,6 +282,17 @@ def main():
     print("  que el deficit adicional que genera la mayor volatilidad es menor.")
     mas_robusta = "A" if fila_a["TC_Var_Pct"] < fila_b["TC_Var_Pct"] else "B"
     print(f"\n  La Politica {mas_robusta} es la mas robusta ante un mercado mas volatil.")
+
+    val_a = buscar("A", ESCENARIO_VALIDACION)
+    val_b = buscar("B", ESCENARIO_VALIDACION)
+    print(f"\n  Escenario '{ESCENARIO_VALIDACION}' ({val_a['SS_Var_Pct']:+.1f}% de sigma):")
+    print(f"    A  SS {val_a['Stock_Seguridad']:.1f}  TC "
+          f"{val_a['TC']:,.0f} ({val_a['TC_Var_Pct']:+.2f}%)".replace(",", "."))
+    print(f"    B  SS {val_b['Stock_Seguridad']:.1f}  TC "
+          f"{val_b['TC']:,.0f} ({val_b['TC_Var_Pct']:+.2f}%)".replace(",", "."))
+    ventaja = val_b["TC"] - val_a["TC"]
+    print(f"    Aun con el desvio fuera de muestra, A sigue siendo mas barata por "
+          f"USD {ventaja:,.0f}.".replace(",", "."))
 
     rutas.preparar(rutas.SENSIBILIDAD)
     rutas.guardar_tabla(detalle, rutas.SENSIBILIDAD / "riesgo_demanda_detalle.csv")

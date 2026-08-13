@@ -54,6 +54,7 @@ def evaluar(parametros_riesgo):
                 "Escenario": nombre,
                 "Factor": factor,
                 "Componente": fila["Componente"],
+                "Demanda_Anual": fila["Demanda_Anual"],
                 "c_B": c_B,
                 "q": resultado["q"],
                 "Stock_Seguridad": resultado["Stock_Seguridad"],
@@ -67,15 +68,31 @@ def evaluar(parametros_riesgo):
 
 
 def resumir(detalle):
-    """Totales por escenario y variacion respecto del caso base."""
-    resumen = detalle.groupby("Escenario", sort=False).agg(
-        q_Promedio=("q", "mean"),
-        Stock_Seguridad_Total=("Stock_Seguridad", "sum"),
-        Deficit_Anual_Total=("Deficit_Anual", "sum"),
-        TC_Total=("TC", "sum"),
-        P_Agotamiento_Media=("P_Agotamiento", "mean"),
-        SLM1_Media=("SLM1", "mean"),
-    ).reset_index()
+    """Totales por escenario y variacion respecto del caso base.
+
+    P(X >= r) y SLM1 se ponderan por demanda anual, no por promedio simple. Es
+    la misma ponderacion que usa la etapa 4b para reportar el nivel de servicio
+    de la Politica A, y tiene que serlo: con promedio simple el escenario base
+    daba 0,0266 y 99,35% mientras la otra seccion informaba 0,0244 y 99,43%
+    para exactamente la misma politica. Un promedio simple ademas le da el mismo
+    peso a un componente que se pide 35 veces al anio que a uno que se pide una,
+    que no es lo que significa "nivel de servicio de la politica".
+    """
+    def ponderar(grupo, columna):
+        return modelos.promedio_ponderado(grupo[columna], grupo["Demanda_Anual"])
+
+    filas = []
+    for escenario, grupo in detalle.groupby("Escenario", sort=False):
+        filas.append({
+            "Escenario": escenario,
+            "q_Promedio": grupo["q"].mean(),
+            "Stock_Seguridad_Total": grupo["Stock_Seguridad"].sum(),
+            "Deficit_Anual_Total": grupo["Deficit_Anual"].sum(),
+            "TC_Total": grupo["TC"].sum(),
+            "P_Agotamiento_Ponderada": ponderar(grupo, "P_Agotamiento"),
+            "SLM1_Ponderado": ponderar(grupo, "SLM1"),
+        })
+    resumen = pd.DataFrame(filas)
 
     base = resumen.loc[resumen["Escenario"] == "c_B base", "TC_Total"].iloc[0]
     resumen["Variacion_TC_Pct"] = 100 * (resumen["TC_Total"] - base) / base
@@ -93,6 +110,9 @@ def graficar(detalle, resumen, ruta):
     izq.set_ylabel("TC(q, r) total anual (miles USD)")
     izq.set_title("Costo total esperado")
     izq.grid(axis="y", alpha=0.3)
+    # Las etiquetas de cada barra son de dos lineas; sin aire arriba la del
+    # escenario mas caro se sale del recuadro.
+    izq.set_ylim(0, resumen["TC_Total"].max() / 1e3 * 1.2)
     for barra, valor, pct in zip(barras, resumen["TC_Total"],
                                  resumen["Variacion_TC_Pct"]):
         izq.text(barra.get_x() + barra.get_width() / 2, valor / 1e3,
@@ -111,6 +131,11 @@ def graficar(detalle, resumen, ruta):
     medio.set_title("Reaccion del stock de seguridad")
     medio.set_xticklabels(medio.get_xticklabels(), rotation=45, ha="right")
     medio.grid(axis="y", alpha=0.3)
+    # El panel 1 ya identifica los tres escenarios por color en su eje X, y el
+    # panel 3 vuelve a usar los mismos: alcanza con una referencia para toda la
+    # figura, que va abajo del todo.
+    manejadores, nombres = medio.get_legend_handles_labels()
+    medio.get_legend().remove()
 
     # Nivel de servicio resultante
     der = ejes[2]
@@ -119,14 +144,26 @@ def graficar(detalle, resumen, ruta):
     pivote_ns = pivote_ns[list(ESCENARIOS)]
     pivote_ns.index = parametros.abreviar(pivote_ns.index)
     pivote_ns.plot(kind="bar", ax=der, color=[colores[e] for e in ESCENARIOS])
-    der.axhline(5, color="black", linestyle="--", linewidth=1, label="alfa = 5%")
+    der.axhline(5, color="black", linestyle="--", linewidth=1,
+                label=f"alfa = {parametros.ALPHA:.0%}")
     der.set_ylabel("P(X >= r)  (%)")
     der.set_xlabel("")
     der.set_title("Probabilidad de agotamiento resultante")
     der.set_xticklabels(der.get_xticklabels(), rotation=45, ha="right")
-    der.legend()
     der.grid(axis="y", alpha=0.3)
+    # Se conserva solo la referencia de alfa, que es la unica que este panel
+    # agrega; los escenarios ya estan en la leyenda de la figura. Se busca por
+    # etiqueta y no por posicion, porque matplotlib devuelve primero las lineas
+    # y despues las barras.
+    manejadores_der, nombres_der = der.get_legend_handles_labels()
+    solo_alfa = [m for m, n in zip(manejadores_der, nombres_der)
+                 if n.startswith("alfa")]
+    der.legend(handles=solo_alfa, loc="upper left")
 
+    fig.legend(manejadores, nombres, loc="lower center", ncol=3,
+               bbox_to_anchor=(0.5, -0.03))
+    fig.suptitle("Sensibilidad al costo de agotamiento: c_B mas y menos 30%",
+                 fontsize=13)
     fig.tight_layout()
     rutas.guardar_figura(fig, ruta)
     plt.close(fig)
@@ -161,8 +198,8 @@ def main():
                                         "Stock_Seguridad_Total": "{:,.1f}".format,
                                         "Deficit_Anual_Total": "{:,.2f}".format,
                                         "TC_Total": "{:,.0f}".format,
-                                        "P_Agotamiento_Media": "{:.4f}".format,
-                                        "SLM1_Media": "{:.2%}".format,
+                                        "P_Agotamiento_Ponderada": "{:.4f}".format,
+                                        "SLM1_Ponderado": "{:.2%}".format,
                                         "Variacion_TC_Pct": "{:+.2f}".format}))
 
     bajo = resumen[resumen["Escenario"] == "c_B -30%"].iloc[0]
@@ -175,11 +212,11 @@ def main():
     print(f"  ajuste pasa por el punto de reabastecimiento: el stock de seguridad")
     print(f"  sube de {bajo['Stock_Seguridad_Total']:.1f} a "
           f"{alto['Stock_Seguridad_Total']:.1f} unidades y la probabilidad de")
-    print(f"  agotamiento baja de {bajo['P_Agotamiento_Media']:.4f} a "
-          f"{alto['P_Agotamiento_Media']:.4f}.")
+    print(f"  agotamiento baja de {bajo['P_Agotamiento_Ponderada']:.4f} a "
+          f"{alto['P_Agotamiento_Ponderada']:.4f}.")
     print("\n  TC(q, r) se mueve mucho menos que el parametro que lo origina: el")
     print("  modelo absorbe el error reajustando r. Aun con c_B un 30% por debajo,")
-    print(f"  la probabilidad de agotamiento ({bajo['P_Agotamiento_Media']:.4f}) sigue")
+    print(f"  la probabilidad de agotamiento ({bajo['P_Agotamiento_Ponderada']:.4f}) sigue")
     print(f"  por debajo del alfa = {parametros.ALPHA} exigido a la Politica B, asi que")
     print("  la recomendacion no cambia por un error de esta magnitud en c_B.")
 

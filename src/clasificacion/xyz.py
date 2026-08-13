@@ -7,12 +7,26 @@ Como todos los componentes se consumen en proporcion fija a las unidades de
 Clasicos, de Vintage o de ambos, solo hay tres perfiles de variabilidad
 posibles. La tabla lo deja a la vista.
 
-Al final se cruza con el ABC para armar la matriz que pide el enunciado.
+Al final se cruza con el ABC para armar la matriz que pide el enunciado. Ese
+cruce es la unica salida de toda la etapa 2: outputs/clasificacion/abc_xyz.csv
+lleva las columnas de las dos clasificaciones, asi que no hace falta guardar
+ademas una tabla de ABC y otra de XYZ por separado.
 """
 
 import pandas as pd
 
 from src import parametros, rutas
+from src.clasificacion import abc
+
+# Columnas del unico archivo que deja la etapa: primero que componente es,
+# despues el ABC (valor de uso) y por ultimo el XYZ (variabilidad).
+COLUMNAS_SALIDA = [
+    "Componente", "Auto_Foco",
+    "Demanda_Anual", "Costo_Unitario", "Valor_Uso_Anual",
+    "Pct_Individual", "Pct_Acumulado", "Clase_ABC",
+    "Demanda_Mensual_Media", "Desvio_Mensual", "CV_Pct", "Clase_XYZ",
+    "Clase",
+]
 
 
 def clasificar(cv_porcentual):
@@ -48,7 +62,6 @@ def calcular(serie):
 def main():
     rutas.titulo("ETAPA 2b - CLASIFICACION XYZ")
     rutas.exigir(rutas.SERIE_MENSUAL, "datos")
-    ruta_abc = rutas.exigir(rutas.CLASIFICACION / "abc.csv", "abc")
 
     serie = pd.read_csv(rutas.SERIE_MENSUAL, parse_dates=["Periodo"])
     tabla = calcular(serie)
@@ -63,16 +76,24 @@ def main():
     for clase in ("X", "Y", "Z"):
         print(f"  {clase}: {reparto.get(clase, 0)} componentes")
 
-    # Cruce ABC x XYZ
-    abc = pd.read_csv(ruta_abc)
-    cruce = abc[["Componente", "Clase_ABC"]].merge(
-        tabla[["Componente", "CV_Pct", "Clase_XYZ"]], on="Componente"
+    # Cruce ABC x XYZ.
+    #
+    # El ABC se recalcula en memoria en vez de leerse de un CSV intermedio. Es
+    # la misma cuenta a partir de la misma serie, y asi la etapa deja un unico
+    # archivo con las dos clasificaciones en lugar de tres que se contienen unos
+    # a otros.
+    tabla_abc = abc.calcular(serie)
+    cruce = tabla_abc.merge(
+        tabla[["Componente", "Demanda_Mensual_Media", "Desvio_Mensual",
+               "CV_Pct", "Clase_XYZ"]],
+        on="Componente",
     )
     cruce["Clase"] = cruce["Clase_ABC"] + cruce["Clase_XYZ"]
-    cruce = cruce.sort_values(["Clase_ABC", "CV_Pct"])
+    cruce = cruce.sort_values(["Clase_ABC", "CV_Pct"]).reset_index(drop=True)
 
     print("\nMatriz ABC / XYZ:")
-    print(cruce.to_string(index=False, formatters={"CV_Pct": "{:.2f}".format}))
+    print(cruce[["Componente", "Clase_ABC", "CV_Pct", "Clase_XYZ", "Clase"]]
+          .to_string(index=False, formatters={"CV_Pct": "{:.2f}".format}))
 
     if (tabla["Clase_XYZ"] == "Z").all():
         print(
@@ -83,8 +104,8 @@ def main():
         )
 
     rutas.preparar(rutas.CLASIFICACION)
-    rutas.guardar_tabla(tabla, rutas.CLASIFICACION / "xyz.csv")
-    rutas.guardar_tabla(cruce, rutas.CLASIFICACION / "abc_xyz.csv")
+    rutas.guardar_tabla(cruce[COLUMNAS_SALIDA],
+                        rutas.CLASIFICACION / "abc_xyz.csv")
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.patches import Patch
 
 from src import parametros, rutas
 
@@ -69,19 +70,37 @@ def graficar(tabla, ruta):
     fig, ax = plt.subplots(figsize=(11, 6))
     colores = {"A": "#c0392b", "B": "#e67e22", "C": "#7f8c8d"}
     etiquetas = parametros.abreviar(tabla["Componente"])
+    posicion = range(len(etiquetas))
 
-    ax.bar(etiquetas, tabla["Valor_Uso_Anual"] / 1e6,
+    ax.bar(posicion, tabla["Valor_Uso_Anual"] / 1e6,
            color=[colores[c] for c in tabla["Clase_ABC"]])
     ax.set_ylabel("Valor de uso anual (millones USD)")
-    ax.set_xticks(range(len(etiquetas)))
+    ax.set_xticks(list(posicion))
     ax.set_xticklabels(etiquetas, rotation=45, ha="right")
-    ax.grid(axis="y", alpha=0.3)
+    # La grilla horizontal se apaga: se dibujaria a la altura de los millones de
+    # USD del eje izquierdo, pero la curva que invita a seguirla se lee sobre el
+    # eje derecho, que esta en porcentaje. Dos escalas y una sola grilla hacen
+    # leer mal el acumulado.
+    ax.grid(False)
 
+    # La curva se dibuja sobre las mismas posiciones numericas que las barras y
+    # no sobre las etiquetas de texto, para que los dos ejes queden alineados
+    # sin depender de como matplotlib registre las categorias.
     eje = ax.twinx()
-    eje.plot(etiquetas, tabla["Pct_Acumulado"], color="black", marker="o", linewidth=1.5)
-    eje.axhline(80, color="black", linestyle="--", linewidth=1)
+    eje.plot(posicion, tabla["Pct_Acumulado"], color="black", marker="o",
+             linewidth=1.5, label="% acumulado")
+    eje.axhline(80, color="black", linestyle="--", linewidth=1,
+                label="Corte de Pareto (80%)")
     eje.set_ylabel("% acumulado")
     eje.set_ylim(0, 105)
+
+    # Sin leyenda el lector no tiene forma de saber que clase es cada color, que
+    # es justamente lo que el grafico intenta mostrar. Las claves se arman a
+    # mano porque el color va por barra y no por serie.
+    referencias = [Patch(facecolor=color, label=f"Clase {clase}")
+                   for clase, color in colores.items()]
+    referencias += eje.get_legend_handles_labels()[0]
+    eje.legend(handles=referencias, loc="center right", framealpha=0.9)
 
     ax.set_title("Analisis ABC de componentes (valor de uso anual)")
     fig.tight_layout()
@@ -113,7 +132,10 @@ def main():
     for nombre in clase_a["Componente"]:
         print(f"  - {nombre}")
 
-    rutas.guardar_tabla(tabla[columnas], rutas.CLASIFICACION / "abc.csv")
+    # La tabla no se guarda aca. La escribe la etapa 2b, que le agrega las
+    # columnas del XYZ y deja las dos clasificaciones en un unico archivo
+    # (outputs/clasificacion/abc_xyz.csv). Guardarla tambien aca dejaba un CSV
+    # que era un subconjunto exacto del otro.
     graficar(tabla, rutas.CLASIFICACION / "abc_pareto.png")
 
 

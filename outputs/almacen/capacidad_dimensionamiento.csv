@@ -1,5 +1,5 @@
 Politica,Escenario,Utilizacion,Volumen_Neto_m3,Volumen_Almacen_m3,Superficie_m2,Costo_Construccion_USD
-A - Pedidos pendientes,Conservador,0.65,278.3395,428.2146,85.6429,128464.3938
-A - Pedidos pendientes,Optimo,0.75,278.3395,371.1194,74.2239,111335.808
-B - Nivel de servicio 95%,Conservador,0.65,260.3065,400.4715,80.0943,120141.4615
-B - Nivel de servicio 95%,Optimo,0.75,260.3065,347.0753,69.4151,104122.6
+A - Pedidos pendientes,Conservador,0.65,348.7,536,107,160500.0
+A - Pedidos pendientes,Optimo,0.75,348.7,465,93,139500.0
+B - Nivel de servicio 95%,Conservador,0.65,317.6,489,98,147000.0
+B - Nivel de servicio 95%,Optimo,0.75,317.6,423,85,127500.0

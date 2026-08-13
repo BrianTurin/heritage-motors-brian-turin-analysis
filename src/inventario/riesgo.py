@@ -95,7 +95,7 @@ def construir():
     ruta_resumen = rutas.exigir(
         rutas.PRONOSTICO / "resumen_pronostico.csv", "pronostico"
     )
-    ruta_abc = rutas.exigir(rutas.CLASIFICACION / "abc.csv", "clasificacion")
+    ruta_abc = rutas.exigir(rutas.CLASIFICACION / "abc_xyz.csv", "clasificacion")
 
     demanda = pd.read_csv(ruta_demanda)
     resumen = pd.read_csv(ruta_resumen).iloc[0]

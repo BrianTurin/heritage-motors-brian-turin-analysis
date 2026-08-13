@@ -17,7 +17,7 @@ El trabajo recorre seis etapas encadenadas. Cada una deja sus resultados en
 |---|---|
 | 1. Datos | Limpia el dataset de ventas y arma la serie mensual de vehículos |
 | 2. Clasificación | ABC por valor de uso anual y XYZ por variabilidad |
-| 3. Pronóstico | Holt-Winters, Prophet y SARIMA; se elige el de menor MAPE |
+| 3. Pronóstico | Holt-Winters, Prophet y SARIMA; se elige por error fuera de muestra |
 | 4. Inventario | Política A (pedidos pendientes) y Política B (nivel de servicio 95%) |
 | 5. Almacén | Capacidad mínima requerida por cada política |
 | 6. Sensibilidad | Costo de agotamiento ±30% y riesgo de demanda +15% |
@@ -43,8 +43,12 @@ make todo PYTHON=.venv/Scripts/python.exe
 ```
 
 Cada etapa se puede correr sola (`make pronostico`, `make inventario`, ...), y
-también cada script por separado (`make pronostico-sarima`). Si falta un archivo
-intermedio, el script avisa qué `make` hay que ejecutar antes.
+casi todas también script por separado (`make clasificacion-abc`). Si falta un
+archivo intermedio, el script avisa qué `make` hay que ejecutar antes.
+
+Las salidas tienen nombre fijo, así que cada corrida pisa a la anterior y
+`outputs/` siempre refleja la última ejecución. Dos corridas seguidas dan
+archivos idénticos byte a byte: no hay nada aleatorio sin semilla en el pipeline.
 
 Sin `make` instalado, los scripts se invocan como módulos desde la raíz:
 
@@ -68,7 +72,12 @@ python -m src.inventario.politicas
 │   │
 │   ├── datos/                  1. limpieza y serie mensual
 │   ├── clasificacion/          2. ABC y XYZ
-│   ├── pronostico/             3. los tres modelos y su comparación
+│   ├── pronostico/             3. los tres modelos, su validación y comparación
+│   │   ├── comun.py              serie, métricas, validación y gráficos
+│   │   ├── holt_winters.py       un modelo por archivo, solo cálculo
+│   │   ├── prophet_modelo.py
+│   │   ├── sarima.py
+│   │   └── comparacion.py        corre los tres, elige y escribe las salidas
 │   ├── inventario/             4. modelos de inventario y aplicación
 │   │   ├── modelos.py            matemática pura, sin lectura ni escritura
 │   │   ├── riesgo.py             c_B y sigma_X de cada componente
@@ -77,7 +86,20 @@ python -m src.inventario.politicas
 │   └── sensibilidad/           6. los dos análisis de sensibilidad
 │
 ├── outputs/                    resultados (CSV y PNG), se regeneran con make todo
-└── docs/                       enunciado, informe y resultados
+│   ├── clasificacion/            abc_xyz.csv, abc_pareto.png
+│   ├── pronostico/               modelos_metricas.csv, modelos_ajuste.csv,
+│   │                             modelos_pronostico.csv, demanda_componentes.csv,
+│   │                             resumen_pronostico.csv y los dos gráficos
+│   ├── inventario/               parametros_riesgo.csv, politicas.csv, verificacion_eoq.csv
+│   ├── almacen/                  capacidad por componente y dimensionamiento del galpón
+│   └── sensibilidad/             c_B ±30% y σ +15%, cada uno con detalle y resumen
+│
+├── docs/
+│   ├── ... - TP Integrador Investigación Operativa (2).pdf   el enunciado
+│   └── ... - Trabajo Integrador IO v1.0.pdf                  el informe que se entrega
+│
+├── Makefile                    los comandos del pipeline
+└── requirements.txt            dependencias
 ```
 
 Dos decisiones de organización que conviene explicar:
@@ -89,6 +111,11 @@ Dos decisiones de organización que conviene explicar:
 - **La matemática separada de la aplicación.** `src/inventario/modelos.py` tiene
   las fórmulas y nada más: no lee archivos ni imprime. Eso permite verificar los
   modelos con valores conocidos, independientemente del pipeline.
+
+  Los tres modelos de pronóstico siguen la misma idea: cada uno expone una sola
+  función `ajustar(serie, horizonte)` que solo calcula, y `comparacion.py` se
+  ocupa de los archivos y de la consola. Sin esa separación no se podría validar,
+  porque la validación necesita reajustar cada modelo cinco veces en silencio.
 
 ---
 
@@ -115,9 +142,53 @@ en abril de 2005.
 del caso, así que no coincide con `SALES / QUANTITYORDERED`. El precio unitario
 se reconstruye desde `SALES`, que es el campo consistente.
 
+**El modelo de pronóstico se elige por error fuera de muestra, no por ajuste.**
+El MAPE del ajuste mide cuánto se parece el modelo a los datos con los que se
+entrenó, y eso premia al que tiene más parámetros aunque prediga peor. Con esta
+serie la diferencia es grande: Prophet es el que mejor ajusta (MAPE 14,70%) y el
+que peor predice (47,39%), porque reparte 22 puntos de cambio de tendencia y 20
+coeficientes de estacionalidad sobre 29 observaciones. La selección usa una
+validación con origen móvil: se entrena con los primeros 24 meses, se predice el
+mes siguiente y se corre el origen, cinco veces. Gana Holt-Winters con 31,87%,
+porque al quedarle los tres parámetros de suavizado en cero no tiene con qué
+seguir el ruido: es el más rígido de los tres y con 29 observaciones la rigidez
+es una ventaja.
+
+**Los tres pesos en cero no dan un pronóstico plano.** Que α, β y γ salgan cero
+significa que nivel, tendencia y estacionalidad no se *actualizan* con cada
+observación nueva, no que no existan: quedan clavados en los valores de la
+inicialización, que statsmodels estima en la misma optimización. El modelo es
+una tendencia lineal fija más una estacionalidad fija. Por eso el pronóstico da
+906 vehículos y no 639, que es el promedio histórico anualizado: la pendiente
+inicial de 0,9475 vehículos/mes extrapolada sobre el horizonte aporta 404 de
+esos 906. La cuenta completa está en el comentario de `holt_winters.py`.
+
+**Prophet perdió por sus valores por defecto, no por ser Prophet.** Los defaults
+están calibrados para series largas, y sobre 29 observaciones el 47% de
+validación dice más de esos defaults que del modelo. Bajando el prior de los
+puntos de cambio de 0,05 a 0,01 y su cantidad de 25 a 5, Prophet valida en
+31,89%: empate técnico con el ganador. Esa corrida queda en la tabla de métricas
+como fila `Prophet_regulado` con `Rol = diagnostico`, y no compite en la
+selección. La elección de Holt-Winters se sostiene igual, pero por parsimonia y
+auditabilidad, y porque su desvío de residuos no está inflado por sobreajuste
+—que es lo que importa, porque ese desvío dimensiona todo el stock de seguridad.
+Prophet regulado ajusta con un desvío de 6,5 contra los 11,3 de Holt-Winters, y
+esa diferencia es flexibilidad del modelo, no menor incertidumbre de la demanda:
+fuera de muestra los dos rondan el mismo RMSE (15,6 y 16,2).
+
 **El stock de seguridad se dimensiona con el error del pronóstico**, no con la
 variabilidad de la serie histórica. Lo que hay que cubrir es lo que el modelo no
-logra anticipar; la estacionalidad ya está dentro del pronóstico.
+logra anticipar; la estacionalidad ya está dentro del pronóstico. Se usa el
+desvío de los residuos del ajuste, sabiendo que subestima algo el error real
+—el RMSE de la validación da más alto—, porque con cinco puntos de validación un
+desvío estimado es demasiado inestable. Las dos cifras quedan reportadas en
+`outputs/pronostico/modelos_metricas.csv`.
+
+**Un archivo de salida por pregunta.** Las tablas que se contenían unas a otras
+se unificaron: la etapa 2 deja una sola clasificación con las columnas del ABC y
+del XYZ, y la etapa 4 deja las dos políticas en una tabla con una columna
+`Politica` en lugar de dos archivos de esquema idéntico. Nada que se pueda
+obtener filtrando o restando otra tabla se guarda aparte.
 
 **El costo de compra queda fuera de la comparación entre políticas.** No es una
 decisión propia: Winston define TC(q, r) como el "costo anual esperado sin

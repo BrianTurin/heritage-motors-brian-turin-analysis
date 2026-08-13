@@ -1,0 +1,5 @@
+Modelo,Nombre,Rol,MAE,RMSE,MAPE,Desvio_Residuos,MAPE_Validacion,RMSE_Validacion,Origenes,Total_Pronosticado,Detalle
+HoltWinters,Holt-Winters aditivo,comparacion,9.1188,11.0923,27.6269,11.2887,31.8745,15.6277,5,906.2587,alfa=0.0000 beta=0.0000 gamma=0.0000
+Prophet,Prophet,comparacion,4.4145,6.3812,14.6964,6.4942,47.3877,35.0094,5,917.3686,"22 puntos de cambio, tendencia de 39 a 77"
+SARIMA,"SARIMA(1, 1, 1)x(1, 0, 1, 12)",comparacion,23.0917,34.8551,53.894,35.4709,54.1241,32.336,5,818.7401,elegido por AIC = 132.9
+Prophet_regulado,Prophet regulado,diagnostico,4.4265,6.4025,14.7137,6.5159,31.8872,16.1544,5,919.5857,"5 puntos de cambio, tendencia de 39 a 77"

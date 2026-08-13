@@ -1,6 +1,6 @@
 Componente,sigma_X,q_EOQ,q_exacto,Dif_q_Pct,TC_EOQ,TC_exacto,Dif_TC_Pct,Cumple_Brown,Iteraciones
-Motor de Alto Rendimiento V8,4.7037,13.7195,15.7276,14.6371,43620.1138,43393.1889,-0.5202,True,11
-Motor de Cilindros en Línea Raro,4.1549,9.3901,11.1592,18.8396,45481.0954,45150.9523,-0.7259,True,12
-Carrocería Artesanal de Época,3.7929,8.3988,10.0463,19.6163,50888.8221,50491.7771,-0.7802,True,12
-Carrocería Estándar (Fibra),3.8406,16.1437,17.7025,9.6559,32461.6022,32373.384,-0.2718,True,10
-Tapicería de Cuero Premium,8.8239,26.2303,29.5454,12.6388,39100.8921,38953.7936,-0.3762,True,11
+Motor de Alto Rendimiento V8,8.1763,13.6361,17.3574,27.29,57406.7804,56707.3176,-1.2184,True,14
+Motor de Cilindros en Línea Raro,7.2224,9.3331,12.6583,35.6288,62243.5966,61224.6195,-1.6371,True,16
+Carrocería Artesanal de Época,6.5931,8.3478,11.4553,37.2255,69657.0427,68430.3468,-1.7611,True,16
+Carrocería Estándar (Fibra),6.676,16.0456,18.8761,17.6403,40785.4066,40514.5436,-0.6641,True,12
+Tapicería de Cuero Premium,15.3383,26.0709,32.147,23.3059,52322.3277,51870.875,-0.8628,True,14

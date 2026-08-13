@@ -26,6 +26,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.ticker import FuncFormatter
 
 from src import parametros, rutas
 from src.inventario import modelos
@@ -34,6 +35,18 @@ COLUMNAS = [
     "Componente", "q", "r", "Stock_Seguridad", "z", "P_Agotamiento",
     "E_Br", "Pedidos_Anio", "Deficit_Anual", "SLM1", "SLM2",
     "Costo_Pedidos", "Costo_Almacenamiento", "Costo_Deficit", "TC",
+]
+
+# Orden de columnas del CSV. Primero las que identifican la fila y despues los
+# resultados, que es como se lee una tabla: antes de mirar un q hay que saber de
+# que componente y de que politica es.
+COLUMNAS_SALIDA = [
+    "Politica", "Componente", "Clase_ABC",
+    "Demanda_Anual", "Costo_Unitario", "Volumen_m3",
+    "q", "r", "z", "Stock_Seguridad", "E_Br", "P_Agotamiento", "SLM1", "SLM2",
+    "Pedidos_Anio", "Deficit_Anual",
+    "Costo_Pedidos", "Costo_Almacenamiento", "Costo_Deficit", "TC",
+    "Costo_Compra",
 ]
 
 FORMATOS = {
@@ -173,9 +186,16 @@ def graficar(comparacion, tabla_a, tabla_b):
         izq.bar("Politica B", valor_b, bottom=base_b, color=color)
         base_a += valor_a
         base_b += valor_b
-    izq.set_ylabel("TC(q, r) anual (USD)")
+    # En miles: en USD crudos el eje muestra numeros de seis cifras que no
+    # aportan precision y desalinean el panel con los otros dos.
+    izq.yaxis.set_major_formatter(
+        FuncFormatter(lambda valor, _: f"{valor / 1e3:,.0f}".replace(",", "."))
+    )
+    izq.set_ylabel("TC(q, r) anual (miles USD)")
     izq.set_title("Descomposicion del costo")
-    izq.legend()
+    # Aire arriba para que la leyenda no se apoye sobre la barra mas alta.
+    izq.set_ylim(0, max(base_a, base_b) * 1.35)
+    izq.legend(loc="upper left")
     izq.grid(axis="y", alpha=0.3)
 
     # Panel 2: stock de seguridad, que es lo unico que distingue a las politicas
@@ -188,7 +208,6 @@ def graficar(comparacion, tabla_a, tabla_b):
     medio.set_title("Stock de seguridad por componente")
     medio.set_xticks(list(posiciones))
     medio.set_xticklabels(etiquetas, rotation=45, ha="right")
-    medio.legend()
     medio.grid(axis="y", alpha=0.3)
 
     # Panel 3: probabilidad de agotamiento durante el plazo de entrega
@@ -197,14 +216,31 @@ def graficar(comparacion, tabla_a, tabla_b):
             label="Politica A (resultante)", color="#4c72b0")
     der.bar([p + ancho / 2 for p in posiciones], 100 * comparacion["P_Agot_B"], ancho,
             label="Politica B (impuesta)", color="#dd8452")
-    der.axhline(5, color="black", linestyle="--", linewidth=1, label="alfa = 5%")
+    der.axhline(5, color="black", linestyle="--", linewidth=1,
+                label=f"alfa = {parametros.ALPHA:.0%}")
     der.set_ylabel("P(X >= r)  (%)")
     der.set_title("Probabilidad de agotamiento en el plazo de entrega")
     der.set_xticks(list(posiciones))
     der.set_xticklabels(etiquetas, rotation=45, ha="right")
-    der.legend(fontsize=8)
+    # Las barras de la Politica B quedan justo sobre la linea de alfa, asi que
+    # la leyenda de este panel se apoyaba encima de los datos. Solo se deja aca
+    # la referencia de alfa; el color de cada politica ya lo explica el panel
+    # del medio, que usa exactamente los mismos dos colores.
+    der.set_ylim(0, 6.5)
+    # Se selecciona por etiqueta y no por posicion: matplotlib devuelve primero
+    # las lineas y despues las barras, asi que quedarse con el ultimo elemento
+    # tomaba una barra en lugar de la linea de alfa.
+    manejadores, nombres = der.get_legend_handles_labels()
+    solo_alfa = [m for m, n in zip(manejadores, nombres) if n.startswith("alfa")]
+    der.legend(handles=solo_alfa, fontsize=8, loc="upper left")
     der.grid(axis="y", alpha=0.3)
 
+    # Una sola leyenda de politicas para toda la figura, abajo. Antes cada panel
+    # repetia la suya diciendo lo mismo y con tamanos distintos.
+    fig.legend(*medio.get_legend_handles_labels(), loc="lower center", ncol=2,
+               bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle("Politica A (pedidos pendientes) contra Politica B "
+                 "(nivel de servicio 95%)", fontsize=13)
     fig.tight_layout()
     rutas.guardar_figura(fig, rutas.INVENTARIO / "comparacion_politicas.png")
     plt.close(fig)
@@ -304,10 +340,10 @@ def main():
     print("\n  SLM1 = fraccion de la demanda que se cumple a tiempo")
     print("  SLM2 = ciclos por anio en los que se presenta deficit")
 
-    slm1_medio = (tabla_a["SLM1"] * tabla_a["Demanda_Anual"]).sum() / \
-        tabla_a["Demanda_Anual"].sum()
-    p_media = (tabla_a["P_Agotamiento"] * tabla_a["Demanda_Anual"]).sum() / \
-        tabla_a["Demanda_Anual"].sum()
+    slm1_medio = modelos.promedio_ponderado(tabla_a["SLM1"],
+                                            tabla_a["Demanda_Anual"])
+    p_media = modelos.promedio_ponderado(tabla_a["P_Agotamiento"],
+                                         tabla_a["Demanda_Anual"])
     print(f"\n  Ponderado por demanda: SLM1 = {slm1_medio:.2%}, "
           f"P(X >= r) = {p_media:.4f}")
     if p_media < parametros.ALPHA:
@@ -317,10 +353,19 @@ def main():
         print(f"  restriccion de servicio del enunciado.")
 
     rutas.preparar(rutas.INVENTARIO)
-    rutas.guardar_tabla(todos_a, rutas.INVENTARIO / "politica_a.csv")
-    rutas.guardar_tabla(todos_b, rutas.INVENTARIO / "politica_b.csv")
-    rutas.guardar_tabla(comparacion, rutas.INVENTARIO / "comparacion_politicas.csv")
+
+    # Las dos politicas van a un solo archivo. Tienen exactamente las mismas
+    # columnas y ya traen una que dice a cual pertenece cada fila, asi que
+    # separarlas obligaba a mantener dos tablas de esquema identico y a volver a
+    # cruzarlas para compararlas. Filtrar por la columna Politica es mas simple.
+    politicas = pd.concat([todos_a, todos_b], ignore_index=True)
+    rutas.guardar_tabla(politicas[COLUMNAS_SALIDA],
+                        rutas.INVENTARIO / "politicas.csv")
     rutas.guardar_tabla(verificacion, rutas.INVENTARIO / "verificacion_eoq.csv")
+
+    # La comparacion A contra B no se guarda: sale entera de filtrar la tabla
+    # anterior por politica y restar. Se usa solo para el grafico y para la
+    # lectura por consola.
     graficar(comparacion, tabla_a, tabla_b)
 
 

@@ -1,4 +1,4 @@
-"""Etapa 3c - Pronostico con SARIMA.
+"""Modelo de pronostico: SARIMA.
 
 Se incluye SARIMA para contrastar, sabiendo de entrada que juega en desventaja:
 la serie tiene 29 observaciones mensuales, o sea poco mas de dos ciclos anuales
@@ -7,8 +7,8 @@ estimarse con precision.
 
 El procedimiento es el habitual:
   1. Test de Dickey-Fuller aumentado para ver si hace falta diferenciar.
-  2. Seleccion del orden por AIC entre un puñado de candidatos razonables.
-  3. Ajuste del modelo elegido y pronostico a 12 meses.
+  2. Seleccion del orden por AIC entre un punado de candidatos razonables.
+  3. Ajuste del modelo elegido y pronostico.
 
 Sobre el punto 1: el ADF rechaza la raiz unitaria, pero igual se deja d=1 entre
 los candidatos. Con 29 datos el test tiene poca potencia, y el pico de noviembre
@@ -24,10 +24,9 @@ import pandas as pd
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-from src import rutas
 from src.pronostico import comun
 
-MODELO = "sarima"
+NOMBRE = "SARIMA"
 
 # Candidatos a evaluar. Se mantienen pocos y simples a proposito: con 29 datos,
 # agregar parametros solo sirve para sobreajustar.
@@ -44,21 +43,18 @@ CANDIDATOS = [
 ]
 
 
-def test_estacionariedad(serie):
-    """Dickey-Fuller aumentado. H0: la serie tiene raiz unitaria."""
+def estacionariedad(serie):
+    """Test de Dickey-Fuller aumentado. H0: la serie tiene raiz unitaria."""
     estadistico, p_valor, _, _, criticos, _ = adfuller(serie.dropna())
-    print("\nTest de Dickey-Fuller aumentado:")
-    print(f"  estadistico  {estadistico:.4f}")
-    print(f"  p-valor      {p_valor:.4f}")
-    print(f"  critico 5%   {criticos['5%']:.4f}")
-    if p_valor < 0.05:
-        print("  se rechaza la raiz unitaria: la serie es estacionaria al 5%")
-    else:
-        print("  no se rechaza la raiz unitaria: conviene diferenciar (d=1)")
-    return p_valor < 0.05
+    return {
+        "estadistico": float(estadistico),
+        "p_valor": float(p_valor),
+        "critico_5": float(criticos["5%"]),
+        "estacionaria": bool(p_valor < 0.05),
+    }
 
 
-def ajustar(serie, orden, orden_estacional):
+def _estimar(serie, orden, orden_estacional):
     """Ajusta un SARIMA y devuelve el resultado de statsmodels.
 
     enforce_stationarity y enforce_invertibility en False evitan que el
@@ -76,58 +72,35 @@ def ajustar(serie, orden, orden_estacional):
         ).fit(disp=False)
 
 
-def seleccionar(serie):
-    """Prueba los candidatos y se queda con el de menor AIC."""
-    print("\nSeleccion de orden por AIC:")
-    print(f"  {'orden':<12} {'estacional':<16} {'AIC':>8} {'MAPE':>8}")
+def ajustar(serie, horizonte=comun.HORIZONTE):
+    """Elige el orden por AIC, ajusta y pronostica. No imprime ni escribe.
 
-    evaluados = []
+    La seleccion de orden esta adentro de esta funcion y no afuera para que la
+    validacion la repita en cada origen. Si el orden se eligiera una sola vez
+    con la serie entera, ya habria mirado los meses que despues se usan como
+    prueba y la validacion quedaria contaminada.
+    """
+    mejor = None
     for orden, orden_estacional in CANDIDATOS:
-        ajuste = ajustar(serie, orden, orden_estacional)
-        ajustado = ajuste.fittedvalues.copy()
-        # El primer valor ajustado no es utilizable cuando hay diferenciacion:
-        # statsmodels arranca en cero y distorsiona el MAPE.
-        ajustado.iloc[0] = serie.iloc[0]
-        resumen = comun.metricas(serie.values, ajustado.values)
-        evaluados.append((ajuste.aic, orden, orden_estacional, ajuste, ajustado, resumen))
-        print(f"  {str(orden):<12} {str(orden_estacional):<16} "
-              f"{ajuste.aic:>8.1f} {resumen['MAPE']:>7.2f}%")
+        modelo = _estimar(serie, orden, orden_estacional)
+        if mejor is None or modelo.aic < mejor[0]:
+            mejor = (modelo.aic, orden, orden_estacional, modelo)
 
-    mejor = min(evaluados, key=lambda fila: fila[0])
-    print(f"\n  elegido: SARIMA{mejor[1]}x{mejor[2]} (AIC {mejor[0]:.1f})")
-    return mejor
+    aic, orden, orden_estacional, modelo = mejor
 
+    ajustado = modelo.fittedvalues.copy()
+    # El primer valor ajustado no es utilizable cuando hay diferenciacion:
+    # statsmodels arranca en cero y distorsiona el MAPE.
+    ajustado.iloc[0] = serie.iloc[0]
 
-def main():
-    rutas.titulo("ETAPA 3c - PRONOSTICO SARIMA")
-    serie = comun.cargar_serie()
-    print(f"Serie: {len(serie)} meses ({serie.index[0]:%Y-%m} a {serie.index[-1]:%Y-%m})")
-    print(f"Ciclos estacionales completos disponibles: {len(serie) / 12:.1f}")
-
-    estacionaria = test_estacionariedad(serie)
-    _, orden, orden_estacional, ajuste, ajustado, resumen = seleccionar(serie)
-
-    if estacionaria and orden[1] == 1:
-        print("\n  Nota: el ADF daba estacionaria pero el AIC prefiere d=1. Con 29")
-        print("  observaciones y un pico estacional muy marcado, el test pierde")
-        print("  potencia; se respeta el criterio de informacion.")
-
-    futuro = comun.meses_futuros(serie)
     pronostico = pd.Series(
-        ajuste.get_forecast(steps=comun.HORIZONTE).predicted_mean.values, index=futuro
+        modelo.get_forecast(steps=horizonte).predicted_mean.values,
+        index=comun.meses_futuros(serie, horizonte),
     ).clip(lower=0)   # una demanda negativa no tiene sentido fisico
 
-    resumen["Total_Pronosticado"] = float(pronostico.sum())
-    resumen["AIC"] = float(ajuste.aic)
-    resumen["Orden"] = f"SARIMA{orden}x{orden_estacional}"
-
-    comun.informar(resumen)
-    print(f"\nTotal pronosticado 12 meses: {pronostico.sum():,.0f} unidades".replace(",", "."))
-
-    comun.exportar(MODELO, serie, ajustado.values, pronostico, resumen)
-    comun.graficar(MODELO, f"SARIMA{orden}x{orden_estacional} - unidades mensuales",
-                   serie, ajustado.values, pronostico)
-
-
-if __name__ == "__main__":
-    main()
+    return comun.Resultado(
+        nombre=f"SARIMA{orden}x{orden_estacional}",
+        ajustado=ajustado.values,
+        pronostico=pronostico,
+        detalle=f"elegido por AIC = {aic:.1f}",
+    )

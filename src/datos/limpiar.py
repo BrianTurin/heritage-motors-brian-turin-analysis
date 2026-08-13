@@ -16,7 +16,8 @@ Decisiones de limpieza (cada una se justifica en el informe):
    unidad. Filtrar solo por 'Shipped' recorta los ultimos meses de la serie
    (abril 2005 pasaria de 29 a 12 lineas) e introduce un valle artificial.
 
-3. PRICEEACH viene topeado en 100 en 797 de las 1.574 lineas del caso, asi que
+3. PRICEEACH viene topeado en 100 en 781 de las 1.545 lineas del caso (contadas
+   despues de descartar los cancelados, que es lo que reporta el pipeline), asi que
    no coincide con SALES / QUANTITYORDERED. Recalculamos el precio unitario a
    partir de SALES, que es el campo consistente.
 

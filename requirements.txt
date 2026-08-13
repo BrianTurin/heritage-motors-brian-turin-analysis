@@ -21,6 +21,3 @@ prophet>=1.1.0
 # Opcional: para desarrollo
 # jupyter>=1.0.0
 # ipykernel>=6.0.0
-
-# Solo para generar el informe en .docx (make informe)
-python-docx>=1.1.0

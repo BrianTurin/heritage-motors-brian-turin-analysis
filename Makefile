@@ -38,15 +38,10 @@ help:
 	@echo "    make sensibilidad       los dos analisis de sensibilidad"
 	@echo ""
 	@echo "  Scripts sueltos"
-	@echo "    make datos-limpiar          make pronostico-holt-winters"
-	@echo "    make datos-serie            make pronostico-prophet"
-	@echo "    make clasificacion-abc      make pronostico-sarima"
-	@echo "    make clasificacion-xyz      make pronostico-comparacion"
-	@echo "    make inventario-riesgo      make sensibilidad-agotamiento"
-	@echo "    make inventario-politicas   make sensibilidad-riesgo"
-	@echo ""
-	@echo "  Informe"
-	@echo "    make informe            regenera docs/INFORME 2.0.docx desde el .md"
+	@echo "    make datos-limpiar          make inventario-riesgo"
+	@echo "    make datos-serie            make inventario-politicas"
+	@echo "    make clasificacion-abc      make sensibilidad-agotamiento"
+	@echo "    make clasificacion-xyz      make sensibilidad-riesgo"
 	@echo ""
 	@echo "  Instalacion"
 	@echo "    make instalar           instala las dependencias de requirements.txt"
@@ -55,10 +50,6 @@ help:
 
 instalar:
 	$(PYTHON) -m pip install -r requirements.txt
-
-
-informe:
-	$(PYTHON) herramientas/informe_a_docx.py
 
 
 # --------------------------------------------------------------- etapas ------
@@ -84,19 +75,11 @@ clasificacion: clasificacion-abc clasificacion-xyz
 
 
 # 3. Pronostico de demanda
-pronostico-holt-winters:
-	$(EJECUTAR) src.pronostico.holt_winters
-
-pronostico-prophet:
-	$(EJECUTAR) src.pronostico.prophet_modelo
-
-pronostico-sarima:
-	$(EJECUTAR) src.pronostico.sarima
-
-pronostico-comparacion:
+#
+# Una sola orden corre los tres modelos, los valida y elige. No tiene sentido
+# correrlos por separado: la seleccion necesita a los tres para comparar.
+pronostico:
 	$(EJECUTAR) src.pronostico.comparacion
-
-pronostico: pronostico-holt-winters pronostico-prophet pronostico-sarima pronostico-comparacion
 
 
 # 4. Modelos de inventario
@@ -136,10 +119,10 @@ limpiar-salidas:
 	$(PYTHON) -c "import shutil; shutil.rmtree('outputs', ignore_errors=True); shutil.rmtree('data/processed', ignore_errors=True); print('outputs/ y data/processed/ borrados')"
 
 
-.PHONY: help instalar informe todo limpiar-salidas \
+.PHONY: help instalar todo limpiar-salidas \
         datos datos-limpiar datos-serie \
         clasificacion clasificacion-abc clasificacion-xyz \
-        pronostico pronostico-holt-winters pronostico-prophet pronostico-sarima pronostico-comparacion \
+        pronostico \
         inventario inventario-riesgo inventario-politicas \
         almacen \
         sensibilidad sensibilidad-agotamiento sensibilidad-riesgo
