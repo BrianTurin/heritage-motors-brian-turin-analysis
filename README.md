@@ -149,19 +149,21 @@ serie la diferencia es grande: Prophet es el que mejor ajusta (MAPE 14,70%) y el
 que peor predice (47,39%), porque reparte 22 puntos de cambio de tendencia y 20
 coeficientes de estacionalidad sobre 29 observaciones. La selección usa una
 validación con origen móvil: se entrena con los primeros 24 meses, se predice el
-mes siguiente y se corre el origen, cinco veces. Gana Holt-Winters con 31,87%,
-porque al quedarle los tres parámetros de suavizado en cero no tiene con qué
-seguir el ruido: es el más rígido de los tres y con 29 observaciones la rigidez
-es una ventaja.
+mes siguiente y se corre el origen, cinco veces. Gana Holt-Winters con 32,20%,
+porque con pesos de suavizado chicos (α = 0,035, β = 0,035, γ = 0,241) no tiene
+con qué seguir el ruido: es el más rígido de los tres y con 29 observaciones la
+rigidez es una ventaja.
 
-**Los tres pesos en cero no dan un pronóstico plano.** Que α, β y γ salgan cero
-significa que nivel, tendencia y estacionalidad no se *actualizan* con cada
-observación nueva, no que no existan: quedan clavados en los valores de la
-inicialización, que statsmodels estima en la misma optimización. El modelo es
-una tendencia lineal fija más una estacionalidad fija. Por eso el pronóstico da
-906 vehículos y no 639, que es el promedio histórico anualizado: la pendiente
-inicial de 0,9475 vehículos/mes extrapolada sobre el horizonte aporta 404 de
-esos 906. La cuenta completa está en el comentario de `holt_winters.py`.
+**Holt-Winters se inicializa con la heurística estándar, no por optimización.**
+Con `initialization_method="estimated"` statsmodels mete el nivel, la tendencia
+y los doce índices iniciales en la misma optimización que α, β y γ, y con 29
+observaciones el optimizador explica toda la serie con la inicialización y deja
+los tres pesos exactamente en cero: un Holt-Winters que no actualiza nada. Con
+la heurística de Hyndman (descomposición sobre los dos primeros ciclos y
+regresión sobre la serie desestacionalizada) los valores iniciales quedan
+fijos, los tres pesos salen positivos y la validación da prácticamente lo
+mismo. El modelo pronostica 886 vehículos contra un promedio histórico
+anualizado de 639.
 
 **Prophet perdió por sus valores por defecto, no por ser Prophet.** Los defaults
 están calibrados para series largas, y sobre 29 observaciones el 47% de
@@ -169,20 +171,26 @@ validación dice más de esos defaults que del modelo. Bajando el prior de los
 puntos de cambio de 0,05 a 0,01 y su cantidad de 25 a 5, Prophet valida en
 31,89%: empate técnico con el ganador. Esa corrida queda en la tabla de métricas
 como fila `Prophet_regulado` con `Rol = diagnostico`, y no compite en la
-selección. La elección de Holt-Winters se sostiene igual, pero por parsimonia y
-auditabilidad, y porque su desvío de residuos no está inflado por sobreajuste
-—que es lo que importa, porque ese desvío dimensiona todo el stock de seguridad.
-Prophet regulado ajusta con un desvío de 6,5 contra los 11,3 de Holt-Winters, y
-esa diferencia es flexibilidad del modelo, no menor incertidumbre de la demanda:
-fuera de muestra los dos rondan el mismo RMSE (15,6 y 16,2).
+selección. La elección de Holt-Winters se sostiene igual, por parsimonia y
+auditabilidad: con 29 observaciones, un modelo con tres pesos es más fácil de
+defender que uno con 45 parámetros regulados a mano.
 
-**El stock de seguridad se dimensiona con el error del pronóstico**, no con la
-variabilidad de la serie histórica. Lo que hay que cubrir es lo que el modelo no
-logra anticipar; la estacionalidad ya está dentro del pronóstico. Se usa el
-desvío de los residuos del ajuste, sabiendo que subestima algo el error real
-—el RMSE de la validación da más alto—, porque con cinco puntos de validación un
-desvío estimado es demasiado inestable. Las dos cifras quedan reportadas en
-`outputs/pronostico/modelos_metricas.csv`.
+**Los modelos de inventario trabajan en base anual.** E(D) es la suma de los
+doce meses pronosticados, la tasa de demanda es E(D)/52 por semana y el punto de
+reabastecimiento es el mismo todo el año. Como en ese esquema la estacionalidad
+no está en E(X), el desvío que alimenta el stock de seguridad es el **desvío de
+los doce meses pronosticados** (42,65 por mes, 20,49 por semana), que es donde
+vive el pico de noviembre, y no el de los residuos del ajuste, que solo mide el
+ruido alrededor del pronóstico. El stock de seguridad se va acumulando con la
+tasa anual a lo largo del año y queda disponible para la estación de mayor
+consumo. El desvío de residuos de cada modelo queda en
+`outputs/pronostico/modelos_metricas.csv` como medida de ajuste.
+
+**Con este desvío el EOQ queda por debajo de σ_X en los cinco insumos de clase
+A**, que es el caso en que Brown (1967) advierte que aproximar q* por el EOQ
+deja de estar garantizado. Se mantiene igual q* = EOQ porque es lo que pide el
+enunciado, y `outputs/inventario/verificacion_eoq.csv` reporta cuánto mejoraría
+el costo la solución exacta del sistema (entre 4% y 10%).
 
 **Un archivo de salida por pregunta.** Las tablas que se contenían unas a otras
 se unificaron: la etapa 2 deja una sola clasificación con las columnas del ABC y

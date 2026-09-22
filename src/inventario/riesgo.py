@@ -47,17 +47,18 @@ Winston, ecuacion (8), pag. 891:  E(X) = L*E(D)  y  sigma_X = sigma_D*raiz(L),
 donde D es la demanda por unidad de tiempo y L el plazo de entrega medido en
 esas mismas unidades. Se arma en tres pasos:
 
-  1. sigma del error de pronostico mensual (residuos del modelo ganador),
+  1. desvio mensual del pronostico (el de los 12 meses pronosticados),
   2. dividido por raiz(4,33) para pasarlo a semanal,
   3. multiplicado por raiz(L) para acumularlo sobre las L semanas del plazo.
 
-El paso 3 supone que los errores de semanas distintas son independientes, que
+El paso 3 supone que las demandas de semanas distintas son independientes, que
 es el supuesto explicito de Winston al deducir (8).
 
-Vale la pena remarcar que se usa el desvio del ERROR de pronostico y no el de
-la demanda historica: el stock de seguridad cubre lo que el pronostico no logra
-anticipar, no la estacionalidad, que ya esta dentro del pronostico y por lo
-tanto ya esta contemplada en E(X).
+Todo el modelo trabaja en base anual: E(X) usa la tasa media E(D)/52 y r es el
+mismo todo el anio. Por eso sigma_D tiene que ser el desvio de la demanda
+mensual pronosticada y no el del error del modelo: la estacionalidad no esta
+en E(X), asi que es el stock de seguridad el que la cubre. Se va acumulando
+con la tasa anual y queda disponible para el pico de noviembre.
 """
 
 import pandas as pd

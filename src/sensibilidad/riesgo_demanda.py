@@ -1,7 +1,7 @@
 """Etapa 6b - Sensibilidad al riesgo (+15% de incertidumbre).
 
-Que pasa si el mercado se vuelve mas volatil y el pronostico empieza a fallar
-un 15% mas. Se aumenta sigma_X en un 15% y se vuelven a resolver las dos
+Que pasa si el mercado se vuelve un 15% mas volatil de lo que dice el
+pronostico. Se aumenta sigma_X en un 15% y se vuelven a resolver las dos
 politicas, para medir cual aguanta mejor.
 
 El punto central es que el stock de seguridad es proporcional a sigma_X:
@@ -32,13 +32,14 @@ ecuacion (12) el lote lleva sumado el deficit del ciclo,
 
     q = (2*E(D)*(K + c_B*E(B_r)) / h)^(1/2)
 
-y ahi sigma_X si entra, a traves de E(B_r). Resuelto asi, el modelo amortigua un
-poco: pide lotes 3 a 5% mas grandes, y como menos ciclos al anio son menos
-oportunidades de agotarse, el stock de seguridad sube 13,5 a 14,3% en vez del 15%
-exacto. El margen de maniobra existe, pero es marginal, asi que la conclusion de
-fondo se sostiene: la volatilidad se paga casi entera con capital parado. La
-verificacion de la etapa 4b (verificacion_eoq.csv) va en la misma linea, con q
-del exacto 17 a 37% por encima del EOQ pero TC a menos del 2% de diferencia.
+y ahi sigma_X si entra, a traves de E(B_r). Resuelto asi, el modelo amortigua:
+pide lotes 9 a 15% mas grandes, y como menos ciclos al anio son menos
+oportunidades de agotarse, el stock de seguridad sube 8 a 12% en vez del 15%
+exacto. La conclusion de fondo se sostiene: la volatilidad se paga sobre todo
+con capital parado. La verificacion de la etapa 4b (verificacion_eoq.csv)
+muestra ademas que con este sigma_X el EOQ queda por debajo de sigma_X en los
+cinco insumos, y el sistema exacto pide lotes bastante mayores con un TC 4 a
+10% menor; se mantiene igual q* = EOQ porque es lo que pide el enunciado.
 
 Donde si se diferencian es en cuanto les cuesta. La Politica A parte de un stock
 de seguridad mas alto, asi que el deficit adicional que genera la mayor
@@ -57,21 +58,6 @@ AUMENTO_SIGMA = 0.15
 
 ESCENARIO_BASE = "Base"
 ESCENARIO_ENUNCIADO = f"+{AUMENTO_SIGMA:.0%}"
-ESCENARIO_VALIDACION = "sigma de validacion"
-
-
-def factor_validacion():
-    """Cuanto mas grande es el error fuera de muestra que el del ajuste.
-
-    El stock de seguridad se dimensiona con el desvio de los residuos del
-    ajuste, que subestima el error real porque el modelo ya vio esos meses. El
-    RMSE de la validacion de origen movil si es fuera de muestra y da bastante
-    mas alto. Este escenario mide cuanto cambiaria todo si se usara ese, que es
-    la unica incertidumbre del modelo que no cubre el +15% del enunciado.
-    """
-    ruta = rutas.exigir(rutas.PRONOSTICO / "resumen_pronostico.csv", "pronostico")
-    resumen = pd.read_csv(ruta).iloc[0]
-    return float(resumen["RMSE_Validacion"] / resumen["Sigma_Error_Mensual"])
 
 
 def evaluar(parametros_riesgo, escenarios):
@@ -143,10 +129,6 @@ def resumir(detalle):
 def graficar(detalle, resumen, ruta):
     fig, ejes = plt.subplots(1, 3, figsize=(16, 5))
 
-    # Los dos primeros paneles contrastan el base con el escenario que pide el
-    # enunciado. El de sigma de validacion queda en la tabla: con tres barras
-    # por politica el panel deja de leerse de un vistazo, y ademas responde otra
-    # pregunta (que tan bien estimamos el error, no que tan volatil es el mercado).
     ss = resumen.pivot(index="Politica", columns="Escenario",
                        values="Stock_Seguridad")
     tc = resumen.pivot(index="Politica", columns="Escenario", values="TC")
@@ -223,14 +205,10 @@ def main():
     # TC base coincida con el que se reporta alli.
     parametros_riesgo = pd.read_csv(ruta).query("Clase_ABC == 'A'").reset_index(drop=True)
 
-    factor = factor_validacion()
     escenarios = {
         ESCENARIO_BASE: 1.0,
         ESCENARIO_ENUNCIADO: 1 + AUMENTO_SIGMA,
-        ESCENARIO_VALIDACION: factor,
     }
-    print(f"Escenario adicional: sigma de validacion, factor {factor:.4f} "
-          f"(+{100 * (factor - 1):.2f}% sobre el desvio del ajuste)\n")
 
     detalle = evaluar(parametros_riesgo, escenarios)
     resumen = resumir(detalle)
@@ -282,17 +260,6 @@ def main():
     print("  que el deficit adicional que genera la mayor volatilidad es menor.")
     mas_robusta = "A" if fila_a["TC_Var_Pct"] < fila_b["TC_Var_Pct"] else "B"
     print(f"\n  La Politica {mas_robusta} es la mas robusta ante un mercado mas volatil.")
-
-    val_a = buscar("A", ESCENARIO_VALIDACION)
-    val_b = buscar("B", ESCENARIO_VALIDACION)
-    print(f"\n  Escenario '{ESCENARIO_VALIDACION}' ({val_a['SS_Var_Pct']:+.1f}% de sigma):")
-    print(f"    A  SS {val_a['Stock_Seguridad']:.1f}  TC "
-          f"{val_a['TC']:,.0f} ({val_a['TC_Var_Pct']:+.2f}%)".replace(",", "."))
-    print(f"    B  SS {val_b['Stock_Seguridad']:.1f}  TC "
-          f"{val_b['TC']:,.0f} ({val_b['TC_Var_Pct']:+.2f}%)".replace(",", "."))
-    ventaja = val_b["TC"] - val_a["TC"]
-    print(f"    Aun con el desvio fuera de muestra, A sigue siendo mas barata por "
-          f"USD {ventaja:,.0f}.".replace(",", "."))
 
     rutas.preparar(rutas.SENSIBILIDAD)
     rutas.guardar_tabla(detalle, rutas.SENSIBILIDAD / "riesgo_demanda_detalle.csv")

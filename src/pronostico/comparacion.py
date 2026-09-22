@@ -11,10 +11,8 @@ entreno. Eso premia al modelo con mas parametros, aunque prediga peor. Con esta
 serie la diferencia no es teorica: Prophet ajusta con 14,7% de MAPE y es el peor
 de los tres prediciendo, porque reparte 22 puntos de cambio de tendencia y 20
 coeficientes de estacionalidad sobre 29 observaciones. Holt-Winters ajusta peor
-y predice mejor, porque al quedarle los tres parametros de suavizado en cero no
-tiene con que seguir el ruido: es el mas rigido de los tres. (Cero en los tres
-pesos no significa pronostico plano; la inicializacion deja una tendencia lineal
-fija mas una estacionalidad fija. La cuenta esta en holt_winters.py.)
+y predice mejor, porque con tres pesos de suavizado chicos no tiene con que
+seguir el ruido: es el mas rigido de los tres.
 
 La tabla de metricas reporta las dos cosas, ajuste y validacion, justamente para
 que la diferencia quede a la vista. La seleccion usa la validacion. Lleva ademas
@@ -22,21 +20,19 @@ una fila de diagnostico, Prophet regulado, que no compite: ver correr_modelos().
 
 Que se lleva la etapa siguiente
 -------------------------------
-  - la demanda promedio anual total (suma de los 12 meses pronosticados), y
-  - el desvio estandar del error de pronostico a nivel de periodo.
+  - la demanda anual esperada E(D): la suma de los 12 meses pronosticados, y
+  - el desvio estandar mensual del pronostico: el desvio de esos 12 valores.
 
-El segundo punto merece una aclaracion. El desvio que interesa para dimensionar
-el stock de seguridad es el del ERROR del pronostico, no el de la serie
-historica ni el de los valores pronosticados. Mide cuanto se equivoca el modelo
-mes a mes, que es exactamente la incertidumbre contra la que hay que cubrirse.
-Se calcula sobre los residuos del ajuste (real - ajustado).
-
-Sobre ese desvio queda una salvedad honesta: los residuos del ajuste subestiman
-el error real, porque el modelo ya vio esos meses. El RMSE de la validacion, que
-si es fuera de muestra, da mas alto. Se usa igual el del ajuste porque la
-validacion tiene solo cinco puntos y un desvio estimado con cinco datos es muy
-inestable; el de validacion queda reportado en la tabla de metricas para que el
-lector pueda ver la brecha.
+Los modelos de inventario trabajan en base anual, con una tasa de demanda
+constante E(D)/52 por semana, y el punto de reabastecimiento es unico para todo
+el anio. Por eso el desvio que los alimenta es el de los 12 meses pronosticados
+y no el de los residuos del ajuste: la demanda durante un plazo de entrega
+cualquiera se aparta de la media anual sobre todo por la estacion en la que
+cae, y el pico de noviembre es lo que el stock de seguridad tiene que cubrir.
+Ese stock se construye con la tasa anual a lo largo de todo el anio, y esta
+disponible cuando llega la estacion de mayor consumo. El desvio de los
+residuos, que solo mide el ruido alrededor del pronostico, dejaria el pico
+afuera. Queda en la tabla de metricas como medida de ajuste de cada modelo.
 """
 
 import matplotlib
@@ -133,18 +129,15 @@ def demanda_por_componente(demanda_anual, desvio_mensual, p_clasico, p_vintage):
     Dos pasos:
 
     1. Del total a cada vehiculo, con la proporcion historica.
-       El desvio del error se reparte con la misma proporcion: si el modelo se
-       equivoca en N unidades de vehiculo, esas N se reparten entre las dos
-       lineas igual que la demanda.
+       El desvio se reparte con la misma proporcion que la demanda.
 
     2. De cada vehiculo a cada componente, con el ratio de uso del enunciado.
        Un componente que se monta 4 veces por auto (llantas, cubiertas)
        multiplica por 4 tanto la demanda como el desvio.
 
     El paso de mensual a semanal divide el desvio por la raiz de la cantidad de
-    semanas del mes. Vale si los errores semanales son independientes entre si:
-    la varianza de la suma es la suma de las varianzas, asi que el desvio
-    mensual es raiz(4,33) veces el semanal.
+    semanas del mes: la varianza de la suma es la suma de las varianzas, asi
+    que el desvio mensual es raiz(4,33) veces el semanal.
     """
     filas = []
     for _, comp in parametros.COMPONENTES.iterrows():
@@ -152,7 +145,7 @@ def demanda_por_componente(demanda_anual, desvio_mensual, p_clasico, p_vintage):
         anual = parametros.demanda_componente(
             demanda_anual * p_clasico, demanda_anual * p_vintage, comp
         )
-        # Desvio del error de pronostico, mismo camino de agregacion
+        # Desvio mensual de la demanda, mismo camino de agregacion
         desvio_mes = parametros.demanda_componente(
             desvio_mensual * p_clasico, desvio_mensual * p_vintage, comp
         )
@@ -164,8 +157,8 @@ def demanda_por_componente(demanda_anual, desvio_mensual, p_clasico, p_vintage):
                 "Auto_Foco": comp["Auto_Foco"],
                 "Demanda_Anual": anual,
                 "Demanda_Semanal": anual / parametros.SEMANAS_POR_ANIO,
-                "Sigma_Error_Mensual": desvio_mes,
-                "Sigma_Error_Semanal": desvio_semana,
+                "Sigma_Demanda_Mensual": desvio_mes,
+                "Sigma_Demanda_Semanal": desvio_semana,
                 "Lead_Time_Semanas": comp["Lead_Time_Semanas"],
                 # Desvio de la demanda durante el plazo de entrega.
                 # Winston, ecuacion (8): sigma_X = sigma_D * raiz(L)
@@ -311,7 +304,7 @@ def main():
     # Parametros que viajan a la etapa de inventario
     pronostico = resultados[elegido].pronostico
     demanda_anual = float(pronostico.sum())
-    desvio_mensual = float(ganador["Desvio_Residuos"])
+    desvio_mensual = float(pronostico.std(ddof=1))
     desvio_semanal = desvio_mensual / parametros.SEMANAS_POR_MES ** 0.5
 
     serie_desagregada = pd.read_csv(rutas.SERIE_MENSUAL, parse_dates=["Periodo"])
@@ -320,7 +313,7 @@ def main():
     print("\nParametros que se llevan a los modelos de inventario:")
     print(f"  Demanda anual total pronosticada  {demanda_anual:,.0f} unidades"
           .replace(",", "."))
-    print(f"  Desvio del error de pronostico    {desvio_mensual:,.1f} unidades/mes"
+    print(f"  Desvio mensual del pronostico     {desvio_mensual:,.1f} unidades/mes"
           .replace(",", "."))
     print(f"  equivalente semanal               {desvio_semanal:,.1f} unidades/semana"
           .replace(",", "."))
@@ -331,17 +324,17 @@ def main():
         demanda_anual, desvio_mensual, p_clasico, p_vintage
     )
     print("\nDemanda y riesgo por componente:")
-    print(componentes[["Componente", "Demanda_Anual", "Sigma_Error_Semanal",
+    print(componentes[["Componente", "Demanda_Anual", "Sigma_Demanda_Semanal",
                        "Lead_Time_Semanas", "sigma_X"]].to_string(
         index=False,
         formatters={"Demanda_Anual": "{:,.0f}".format,
-                    "Sigma_Error_Semanal": "{:,.2f}".format,
+                    "Sigma_Demanda_Semanal": "{:,.2f}".format,
                     "sigma_X": "{:,.2f}".format}))
 
     # --- Salidas ---
     print()
     rutas.preparar(rutas.PRONOSTICO)
-    inferior, superior = comun.banda(pronostico, desvio_mensual)
+    inferior, superior = comun.banda(pronostico, float(ganador["Desvio_Residuos"]))
 
     rutas.guardar_tabla(metricas, rutas.PRONOSTICO / "modelos_metricas.csv")
     rutas.guardar_tabla(tabla_ajuste(serie, resultados),
@@ -354,12 +347,8 @@ def main():
         "Nombre": ganador["Nombre"],
         "MAPE_Validacion": ganador["MAPE_Validacion"],
         "Demanda_Anual_Total": demanda_anual,
-        "Sigma_Error_Mensual": desvio_mensual,
-        "Sigma_Error_Semanal": desvio_semanal,
-        # El desvio fuera de muestra viaja junto al del ajuste porque la etapa 6b
-        # lo necesita para el escenario de sensibilidad al riesgo: el del ajuste
-        # subestima el error real y conviene medir cuanto cambia todo con el otro.
-        "RMSE_Validacion": float(ganador["RMSE_Validacion"]),
+        "Sigma_Demanda_Mensual": desvio_mensual,
+        "Sigma_Demanda_Semanal": desvio_semanal,
         "Proporcion_Clasicos": p_clasico,
         "Proporcion_Vintage": p_vintage,
     }]), rutas.PRONOSTICO / "resumen_pronostico.csv")

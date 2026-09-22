@@ -124,15 +124,15 @@ def regulado(serie, horizonte=comun.HORIZONTE):
     conclusion permite sacar la comparacion: con los defaults Prophet valida en
     47,39% y parece muy inferior a Holt-Winters, pero bajando el prior de los
     puntos de cambio de 0,05 a 0,01 y su cantidad de 25 a 5 valida en 31,89%,
-    practicamente empatado con el ganador (31,87%).
+    practicamente empatado con el ganador (32,20%).
 
     O sea que lo que falla no es Prophet sino sus valores por defecto sobre una
     serie corta. La eleccion de Holt-Winters se sostiene igual, pero por otros
-    motivos: es mas simple de auditar y su desvio de residuos no esta inflado
-    por el sobreajuste, que importa porque ese desvio dimensiona el stock de
-    seguridad. Prophet regulado sigue ajustando con 14,7% de MAPE y un desvio de
-    6,5 contra los 11,3 de Holt-Winters, y esa diferencia es sobreajuste, no
-    menor incertidumbre: fuera de muestra los dos rondan el mismo RMSE.
+    motivos: es mas simple de auditar y con 29 observaciones tiene menos que
+    ajustar. Prophet regulado sigue ajustando con 14,7% de MAPE y un desvio de
+    residuos de 6,5 contra los 16,7 de Holt-Winters, y esa diferencia es
+    flexibilidad del modelo, no menor incertidumbre: fuera de muestra el RMSE
+    es parecido (16,2 contra 19,0).
     """
     return ajustar(serie, horizonte, changepoint_prior_scale=0.01,
                    n_changepoints=5, nombre="Prophet regulado")

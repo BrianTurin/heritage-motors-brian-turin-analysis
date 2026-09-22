@@ -275,10 +275,17 @@ def main():
                                              "TC_EOQ": "{:,.0f}".format,
                                              "TC_exacto": "{:,.0f}".format,
                                              "Dif_TC_Pct": "{:+.3f}".format}))
+    peor = verificacion["Dif_TC_Pct"].abs().max()
     if verificacion["Cumple_Brown"].all():
-        peor = verificacion["Dif_TC_Pct"].abs().max()
         print(f"\n  Los cinco componentes cumplen EOQ > sigma_X, y la solucion exacta")
         print(f"  mejora el costo a lo sumo un {peor:.3f}%. La aproximacion es valida.")
+    else:
+        incumplen = int((~verificacion["Cumple_Brown"]).sum())
+        print(f"\n  {incumplen} de {len(verificacion)} componentes tienen EOQ <= sigma_X, asi")
+        print(f"  que la aproximacion no esta garantizada: la solucion exacta pide")
+        print(f"  lotes mayores y mejora el costo hasta un {peor:.2f}%. Se mantiene")
+        print(f"  q* = EOQ porque es lo que pide el enunciado, y la diferencia queda")
+        print(f"  reportada en verificacion_eoq.csv.")
 
     mostrar("POLITICA A - Pedidos pendientes (optima por costos)", tabla_a)
     mostrar("POLITICA B - Nivel de servicio 95%", tabla_b)
