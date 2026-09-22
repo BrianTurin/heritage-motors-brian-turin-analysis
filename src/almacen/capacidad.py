@@ -55,6 +55,8 @@ entre el 45% y el 85% del espacio total. Se plantean dos escenarios dentro de
 ese rango, uno conservador y uno exigente.
 """
 
+import math
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -103,12 +105,16 @@ def dimensionar(volumen_neto):
     x 1.500 = 160.952, y un lector que multiplica los 107 m2 de la tabla obtiene
     160.500: la tabla dejaba de cerrar consigo misma. Nadie construye 107,3 m2,
     asi que se redondea y se valoriza sobre el redondeo.
+
+    La superficie se redondea hacia arriba: redondear al mas cercano puede dejar
+    un galpon mas chico que el volumen pedido (1.252 m3 / 5 m = 250,4 -> 250 m2,
+    que son 1.250 m3).
     """
     neto = round(volumen_neto, 1)
     filas = []
     for nombre, utilizacion in ESCENARIOS.items():
         volumen_total = round(neto / utilizacion)
-        superficie = round(volumen_total / ALTURA_UTIL_M)
+        superficie = math.ceil(volumen_total / ALTURA_UTIL_M)
         filas.append({
             "Escenario": nombre,
             "Utilizacion": utilizacion,
@@ -247,8 +253,8 @@ def main():
                   - costos["Costo_Construccion_USD"].min())
     print(f"Sobrecosto de obra del escenario conservador: USD {delta_obra:,.0f}"
           .replace(",", "."))
-    print("\nLa Politica A pide mas galpon porque pide lotes mas grandes y mas")
-    print("stock de seguridad. Ese sobrecosto es de una sola vez, mientras que la")
+    print("\nLa Politica A pide mas galpon porque lleva mas stock de seguridad (el")
+    print("lote es el mismo). Ese sobrecosto es de una sola vez, mientras que la")
     print("diferencia de costo operativo se repite todos los anios: conviene")
     print("compararlos sobre el mismo horizonte antes de decidir.")
 
